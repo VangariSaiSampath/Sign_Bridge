@@ -12,7 +12,7 @@ app = FastAPI()
 # --- LOAD ASL MODEL ---
 import tflite_runtime.interpreter as tflite
 
-interpreter = tflite.Interpreter(model_path="gesture_model.tflite")
+interpreter = tflite.Interpreter(model_path="gesture_model_optimized.tflite")
 interpreter.allocate_tensors()
 
 input_details = interpreter.get_input_details()
