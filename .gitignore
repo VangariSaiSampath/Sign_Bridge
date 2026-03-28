@@ -1,0 +1,22 @@
+# Run from your project root (SignBridge folder)
+cat > .gitignore << 'EOF'
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Training data (too large — NOT needed for deployment)
+data/
+X.npy
+y.npy
+
+# Local database
+signbridge.db
+
+# VS Code
+.vscode/
+
+# OS
+.DS_Store
+EOF

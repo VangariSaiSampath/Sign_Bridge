@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SignBridge AI Dashboard</title>
+
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+
+  <style>
+    :root { --glow: transparent; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, sans-serif; background: #0f172a; color: #ffffff; min-height: 100vh; overflow-x: hidden; }
+    .hidden { display: none !important; }
+    .app-shell { display: flex; min-height: 100vh; }
+    
+    .sidebar { width: 250px; background: #020617; border-right: 1px solid rgba(255,255,255,0.1); padding: 24px 16px; display: flex; flex-direction: column; }
+    .logo { font-size: 24px; font-weight: bold; color: #60a5fa; margin-bottom: 8px; }
+    .subtitle { color: #94a3b8; font-size: 14px; margin-bottom: 28px; }
+    .nav-btn { width: 100%; background: transparent; color: #cbd5e1; border: none; padding: 14px 16px; text-align: left; border-radius: 12px; cursor: pointer; margin-bottom: 10px; font-size: 15px; transition: 0.3s; }
+    .nav-btn:hover, .nav-btn.active { background: #2563eb; color: #fff; }
+    
+    .main { flex: 1; padding: 24px; max-width: 100%; }
+    .topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+    .title h1 { font-size: 28px; }
+    
+    .btn { background: #2563eb; color: white; border: none; padding: 12px 18px; border-radius: 12px; cursor: pointer; font-weight: bold; transition: 0.3s;}
+    .btn:hover { background: #1d4ed8; }
+    .btn-outline { background: transparent; border: 1px solid rgba(255,255,255,0.15); color: #fff; }
+    .btn-danger { background: #ef4444; }
+    .btn-warning { background: #f59e0b; }
+    
+    .card { background: #111827; border: 1px solid rgba(255,255,255,0.08); border-radius: 20px; padding: 20px; box-shadow: 0 8px 25px rgba(0,0,0,0.25); margin-bottom: 20px;}
+    .grid { display: grid; gap: 20px; }
+    .grid-2 { grid-template-columns: 1.5fr 1fr; }
+    
+    .preview-box { background: rgba(37,99,235,0.08); border-radius: 18px; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; padding: 10px; }
+    #output_canvas { width: 100%; max-width: 1000px; border-radius: 12px; border: 4px solid var(--glow); transition: 0.2s; }
+    video { display: none; }
+
+    .result-box { background: rgba(37,99,235,0.12); border: 1px solid rgba(96,165,250,0.3); border-radius: 18px; padding: 20px; position: relative;}
+    .result-box h2 { font-size: 38px; color: #60a5fa; margin-top: 5px; text-transform: uppercase; }
+    
+    .form-group { margin-bottom: 16px; }
+    label { display: block; font-size: 14px; margin-bottom: 8px; color: #e2e8f0; }
+    input[type=text], input[type=password] { width: 100%; padding: 12px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); background: #020617; color: white; }
+    input[type=range] { width: 100%; cursor: pointer; accent-color: #2563eb; }
+    
+    .pwd-wrapper { position: relative; width: 100%; margin-bottom: 10px; }
+    .pwd-wrapper input { margin-bottom: 0; padding-right: 40px; }
+    .pwd-toggle { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); background: none; border: none; color: #94a3b8; cursor: pointer; font-size: 16px; transition: 0.3s; }
+    .pwd-toggle:hover { color: #fff; }
+
+    .toast { position: fixed; top: 20px; right: 20px; background: #1e293b; color: white; padding: 14px 18px; border-radius: 14px; z-index: 999; }
+    .success { border-left: 4px solid #22c55e; }
+    .error { border-left: 4px solid #ef4444; }
+
+    table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+    th, td { padding: 12px; text-align: left; border-bottom: 1px solid rgba(255,255,255,0.1); }
+    th { color: #94a3b8; }
+
+    .auth-tabs { display: flex; gap: 10px; margin-bottom: 20px; }
+    .tab-btn { flex: 1; padding: 10px; border-radius: 8px; border: none; cursor: pointer; background: #1e293b; color: #94a3b8; font-weight: bold; transition: 0.3s; }
+    .tab-btn.active { background: #2563eb; color: white; }
+
+    #settings-panel { transition: max-height 0.3s ease-out; overflow: hidden; }
+    
+    /* Live Letter Badge */
+    .live-badge { background: #020617; border: 1px solid rgba(96,165,250,0.3); border-radius: 12px; padding: 10px 20px; text-align: center; min-width: 80px;}
+    .live-badge h1 { color: #22c55e; font-size: 42px; line-height: 1; margin: 0; text-transform: uppercase;}
+
+    /* Auth Layout specific for 2 columns */
+    @media (max-width: 768px) {
+        .auth-container { grid-template-columns: 1fr !important; }
+        .grid-2 { grid-template-columns: 1fr !important; }
+    }
+  </style>
+</head>
+<body>
+  <div id="toast" class="toast hidden"></div>
+
+  <section id="authPage" class="auth-wrapper" style="min-height: 100vh; display: flex; align-items: center; justify-content: center;">
+    <div class="auth-container" style="max-width: 900px; display: grid; grid-template-columns: 1fr 1fr; gap: 24px; width: 100%; padding: 20px;">
+      
+      <div class="card" style="background: linear-gradient(135deg, rgba(37,99,235,0.2), rgba(15,23,42,1)); padding: 40px; display: flex; flex-direction: column; justify-content: center;">
+        <div class="logo" style="font-size: 32px; margin-bottom: 15px;">SignBridge AI</div>
+        <h1 style="margin-bottom: 15px; line-height: 1.2;">Cross-Platform ASL Translation</h1>
+        <p style="line-height: 1.7; color:#94a3b8;">Login to access real-time gesture recognition powered by MediaPipe and FastAPI.</p>
+      </div>
+
+      <div class="card" style="padding: 30px;">
+        <div class="auth-tabs">
+          <button id="tabLogin" class="tab-btn active" onclick="switchAuth('login')">Login</button>
+          <button id="tabSignup" class="tab-btn" onclick="switchAuth('signup')">Sign Up</button>
+        </div>
+
+        <div id="loginFields">
+          <h2 style="margin-bottom: 20px; font-size: 24px;">Welcome Back</h2>
+          <div class="form-group">
+            <label>Username</label>
+            <input type="text" id="logU" placeholder="Enter username" style="margin-bottom: 10px;" />
+            <label>Password</label>
+            <div class="pwd-wrapper">
+              <input type="password" id="logP" placeholder="Enter password" />
+              <button class="pwd-toggle" onclick="togglePassword('logP', this)">👁️</button>
+            </div>
+          </div>
+          <button class="btn" style="width:100%" onclick="handleAuth('login')">Login to Dashboard</button>
+        </div>
+
+        <div id="signupFields" class="hidden">
+          <h2 style="margin-bottom: 20px; font-size: 24px;">Create Account</h2>
+          <div class="form-group">
+            <label>New Username</label>
+            <input type="text" id="sigU" placeholder="Choose username" style="margin-bottom: 10px;" />
+            <label>New Password</label>
+            <div class="pwd-wrapper">
+              <input type="password" id="sigP" placeholder="Choose password" />
+              <button class="pwd-toggle" onclick="togglePassword('sigP', this)">👁️</button>
+            </div>
+          </div>
+          <button class="btn btn-warning" style="width:100%" onclick="handleAuth('signup')">Create Account</button>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <section id="dashboardPage" class="hidden">
+    <div class="app-shell">
+      
+      <aside class="sidebar">
+        <div class="logo">SignBridge</div>
+        <div class="subtitle" id="welcomeUser">Menu</div>
+        
+        <button id="nav-dashboard" class="nav-btn active" onclick="switchPage('dashboard')">Dashboard</button>
+        <button id="nav-history" class="nav-btn" onclick="switchPage('history')">History</button>
+        <button id="nav-vocab" class="nav-btn" onclick="switchPage('vocab')">Vocabulary Settings</button>
+        
+        <button class="nav-btn" onclick="toggleSettings()" style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px;">
+          <span>⚙️ AI Tuning</span> <span id="settings-icon">▼</span>
+        </button>
+        
+        <div id="settings-panel" class="hidden" style="background: rgba(0,0,0,0.2); padding: 15px; border-radius: 12px; margin-bottom: 10px; border: 1px solid rgba(255,255,255,0.05);">
+          <div class="form-group" style="margin-bottom: 15px;">
+            <label style="font-size: 13px; color: #cbd5e1;">Sign Strictness: <span id="acc_val" style="color:#60a5fa">85</span>%</label>
+            <input type="range" id="acc_slider" min="70" max="98" value="85">
+          </div>
+          <div class="form-group" style="margin-bottom: 0;">
+            <label style="font-size: 13px; color: #cbd5e1;">Predicting Speed: <span id="speed_val" style="color:#60a5fa">5</span> f</label>
+            <input type="range" id="speed_slider" min="2" max="20" value="5">
+          </div>
+        </div>
+
+        <button class="nav-btn btn-danger" onclick="logoutUser()" style="margin-top: auto;">Logout</button>
+      </aside>
+
+      <main class="main">
+        <div class="topbar">
+          <h1 id="pageTitle">Dashboard</h1>
+          <span id="conn_status" style="padding: 10px; border-radius: 8px; background: #ef4444; font-weight: bold; font-size: 12px;">Offline</span>
+        </div>
+
+        <div id="page-dashboard">
+          <div class="grid grid-2">
+            
+            <div>
+              <div class="card">
+                <h2 class="section-title" style="margin-bottom:15px;">Camera Feed</h2>
+                <div class="preview-box">
+                  <video id="input_video" autoplay playsinline></video>
+                  <canvas id="output_canvas"></canvas>
+                </div>
+                <div style="display:flex; gap:10px; margin-top: 15px;">
+                  <button class="btn" style="width: 100%;" id="camBtn" onclick="startWebcam()">Start AI Webcam</button>
+                </div>
+              </div>
+            </div>
+              
+            <div>
+              <div class="card result-box">
+                <div style="display:flex; justify-content:space-between; align-items: flex-start;">
+                  <div>
+                    <p style="color:#94a3b8;">Predicted Word</p>
+                    <h2 id="predictedWord">...</h2>
+                  </div>
+                  <div class="live-badge">
+                    <p style="color:#94a3b8; font-size:11px; margin-bottom:3px; font-weight:bold;">LIVE SIGN</p>
+                    <h1 id="liveLetter">-</h1>
+                  </div>
+                </div>
+
+                <p id="liveTyping" style="color:#94a3b8; font-size:16px; margin-top:15px;">Typing: </p>
+                <p id="wordMeaning" style="color: #f59e0b; margin-top: 10px; font-style: italic; min-height: 40px;">Meaning will appear here</p>
+                <button class="btn btn-outline" style="margin-top:10px; font-size:12px; padding: 8px 12px;" onclick="saveCurrentWordToVocab()">⭐ Save to Vocabulary</button>
+              </div>
+              
+              <div class="card" style="background:#0b1220;">
+                <p style="color:#94a3b8;">Full Sentence (Press Clear to save to History)</p>
+                <p id="translatedText" style="font-size:24px; margin-top:8px; font-weight:bold; min-height:35px;">Waiting for signs...</p>
+              </div>
+              
+              <div style="display:flex; gap:10px; margin-bottom: 20px;">
+                <button class="btn btn-warning" style="flex:1" onclick="sendCommand('backspace')">Backspace</button>
+                <button class="btn btn-danger" style="flex:1" onclick="sendCommand('clear')">Clear & Save</button>
+              </div>
+
+              <div class="grid grid-2" style="grid-template-columns: 1fr 1fr;">
+                <div class="card" style="background:#0b1220; padding:15px;">
+                  <p style="color:#94a3b8;">Confidence</p>
+                  <p id="confidenceScore" style="font-size:22px; margin-top:5px; color:#22c55e;">0.0%</p>
+                </div>
+                <div class="card" style="background:#0b1220; padding:15px;">
+                  <p style="color:#94a3b8;">Mood</p>
+                  <p id="emotionDisplay" style="font-size:22px; margin-top:5px; color:#f59e0b; text-transform: capitalize;">--</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div id="page-history" class="hidden card">
+          <div style="display:flex; justify-content:space-between; margin-bottom: 15px; align-items:center;">
+            <p style="color: #94a3b8;">Sentences are saved here when you click "Clear & Save".</p>
+            <button class="btn btn-outline" onclick="loadHistory()">Refresh List</button>
+          </div>
+          <table>
+            <thead><tr><th style="width:200px;">Time</th><th>Translated Sentence</th></tr></thead>
+            <tbody id="historyTableBody"><tr><td colspan="2" style="text-align:center;">Click refresh to load history</td></tr></tbody>
+          </table>
+        </div>
+
+        <div id="page-vocab" class="hidden card">
+          <div style="display:flex; justify-content:space-between; margin-bottom: 15px; align-items:center;">
+            <p style="color: #94a3b8;">Your Personal Dictionary of Saved Signs.</p>
+            <button class="btn btn-outline" onclick="loadVocab()">Refresh List</button>
+          </div>
+          <table>
+            <thead><tr><th style="width:200px;">Word</th><th>Meaning</th><th style="width:100px;">Action</th></tr></thead>
+            <tbody id="vocabTableBody"><tr><td colspan="3" style="text-align:center;">No words saved yet.</td></tr></tbody>
+          </table>
+        </div>
+
+      </main>
+    </div>
+  </section>
+
+  <script>
+    let ws = null;
+    let cameraInstance = null;
+    let lastEmo = 0;
+
+    const videoElement = document.getElementById('input_video');
+    const canvasElement = document.getElementById('output_canvas');
+    const canvasCtx = canvasElement.getContext('2d');
+    const accSlider = document.getElementById('acc_slider');
+    const speedSlider = document.getElementById('speed_slider');
+
+    accSlider.oninput = () => document.getElementById('acc_val').innerText = accSlider.value;
+    speedSlider.oninput = () => document.getElementById('speed_val').innerText = speedSlider.value;
+
+    function showToast(type, message) {
+      const t = document.getElementById('toast');
+      t.className = `toast ${type}`; t.textContent = message;
+      setTimeout(() => t.className = 'toast hidden', 2500);
+    }
+
+    window.onload = () => {
+      const token = sessionStorage.getItem('jwt_token');
+      if (token) {
+        document.getElementById('authPage').classList.add('hidden');
+        document.getElementById('dashboardPage').classList.remove('hidden');
+        document.getElementById('welcomeUser').innerText = `Welcome, ${sessionStorage.getItem('username')}`;
+      } else {
+        sessionStorage.clear(); 
+      }
+    };
+
+    function switchAuth(mode) {
+      document.getElementById('loginFields').classList.toggle('hidden', mode !== 'login');
+      document.getElementById('signupFields').classList.toggle('hidden', mode !== 'signup');
+      document.getElementById('tabLogin').classList.toggle('active', mode === 'login');
+      document.getElementById('tabSignup').classList.toggle('active', mode === 'signup');
+    }
+
+    function togglePassword(inputId, btn) {
+      const input = document.getElementById(inputId);
+      if (input.type === 'password') {
+        input.type = 'text'; btn.innerText = '👁️‍🗨️'; 
+      } else {
+        input.type = 'password'; btn.innerText = '👁️';
+      }
+    }
+
+    async function handleAuth(mode) {
+      const u = document.getElementById(mode === 'login' ? 'logU' : 'sigU').value.trim();
+      const p = document.getElementById(mode === 'login' ? 'logP' : 'sigP').value.trim();
+      if(!u || !p) return showToast('error', 'Fields cannot be empty');
+
+      try {
+        const res = await fetch(mode === 'login' ? '/login' : '/signup', {
+          method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({username: u, password: p})
+        });
+        const data = await res.json();
+        if(res.ok) {
+          if(mode === 'login') {
+            sessionStorage.setItem('jwt_token', data.access_token);
+            sessionStorage.setItem('username', u);
+            window.location.reload();
+          } else {
+            showToast('success', 'Account created! Please login.');
+            document.getElementById('logU').value = u; document.getElementById('logP').value = p;
+            switchAuth('login');
+          }
+        } else { showToast('error', data.detail || 'Authentication failed'); }
+      } catch(e) { showToast('error', 'Server error'); }
+    }
+
+    function logoutUser() {
+      sessionStorage.clear();
+      window.location.reload();
+    }
+
+    function switchPage(page) {
+      ['dashboard', 'history', 'vocab'].forEach(p => {
+        document.getElementById(`page-${p}`).classList.add('hidden');
+        document.getElementById(`nav-${p}`).classList.remove('active');
+      });
+      document.getElementById(`page-${page}`).classList.remove('hidden');
+      document.getElementById(`nav-${page}`).classList.add('active');
+      const titles = { 'dashboard': 'Dashboard', 'history': 'Translation History', 'vocab': 'Vocabulary Settings' };
+      document.getElementById('pageTitle').innerText = titles[page];
+      if(page === 'history') loadHistory();
+      if(page === 'vocab') loadVocab();
+    }
+
+    function toggleSettings() {
+      const panel = document.getElementById('settings-panel');
+      const icon = document.getElementById('settings-icon');
+      panel.classList.toggle('hidden');
+      icon.innerText = panel.classList.contains('hidden') ? '▼' : '▲';
+    }
+
+    async function loadHistory() {
+      try {
+        const res = await fetch('/api/history'); const data = await res.json();
+        const tbody = document.getElementById('historyTableBody'); tbody.innerHTML = "";
+        if(data.length === 0) tbody.innerHTML = `<tr><td colspan="2" style="text-align:center;">No history yet.</td></tr>`;
+        
+        data.forEach(row => {
+          const localTime = new Date(row.time.replace(' ', 'T') + 'Z').toLocaleString();
+          tbody.innerHTML += `<tr><td style="color:#94a3b8;">${localTime}</td><td style="font-weight:bold; color:white;">${row.sentence}</td></tr>`;
+        });
+      } catch (e) { showToast('error', 'Failed to load history'); }
+    }
+
+    async function loadVocab() {
+      try {
+        const res = await fetch('/api/vocab'); const data = await res.json();
+        const tbody = document.getElementById('vocabTableBody'); tbody.innerHTML = "";
+        if (data.length === 0) return tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;">No words saved yet.</td></tr>`;
+        data.forEach(row => tbody.innerHTML += `<tr><td style="font-weight:bold; color:#60a5fa; font-size:18px;">${row.word}</td><td style="color:white; font-size:14px; padding-right:15px;">${row.meaning}</td><td><button class="btn btn-danger" style="padding: 6px 10px; font-size:12px;" onclick="deleteVocab(${row.id})">Remove</button></td></tr>`);
+      } catch (e) { showToast('error', 'Failed to load vocabulary'); }
+    }
+
+    async function saveCurrentWordToVocab() {
+      const word = document.getElementById('predictedWord').innerText;
+      const meaningText = document.getElementById('wordMeaning').innerText.replace("Meaning: ", "");
+      if (word === "..." || !word) return showToast('error', 'No word to save!');
+      try {
+        const res = await fetch('/api/vocab', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: sessionStorage.getItem('username') || "User", word: word, meaning: meaningText }) });
+        if (res.ok) showToast('success', `${word} saved to Vocabulary!`);
+      } catch (e) { showToast('error', 'Failed to save word'); }
+    }
+
+    async function deleteVocab(id) {
+      try {
+        const res = await fetch(`/api/vocab/${id}`, { method: 'DELETE' });
+        if (res.ok) { showToast('success', 'Word removed'); loadVocab(); }
+      } catch (e) { showToast('error', 'Failed to remove word'); }
+    }
+
+    const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
+    hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.6, minTrackingConfidence: 0.6 });
+
+    hands.onResults((results) => {
+      canvasCtx.save();
+      canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+      canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
+      
+      let payload = { landmarks: null, image: null, config: { threshold: parseFloat(accSlider.value) / 100, buffer: parseInt(speedSlider.value), emo_threshold: 0.5 } };
+      if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+        drawConnectors(canvasCtx, results.multiHandLandmarks[0], HAND_CONNECTIONS, {color: '#00FF00', lineWidth: 4});
+        drawLandmarks(canvasCtx, results.multiHandLandmarks[0], {color: '#FF0000', lineWidth: 2});
+        payload.landmarks = results.multiHandLandmarks[0];
+      }
+      if (Date.now() - lastEmo > 4000) { payload.image = canvasElement.toDataURL('image/jpeg', 0.3); lastEmo = Date.now(); }
+      if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(payload));
+      canvasCtx.restore();
+    });
+
+    // START SMART WEBCAM (Adapts to Mobile vs Laptop)
+    function startWebcam() {
+      const camBtn = document.getElementById('camBtn');
+      camBtn.innerText = "Starting...";
+      camBtn.disabled = true;
+
+      // Detect if device is a phone/tablet. 
+      // Uses 640x480 for mobile to prevent lag, 1280x720 HD for laptops.
+      const isMobile = window.innerWidth <= 768;
+      const camWidth = isMobile ? 640 : 1280;
+      const camHeight = isMobile ? 480 : 720;
+
+      cameraInstance = new Camera(videoElement, { 
+        onFrame: async () => { await hands.send({image: videoElement}); }, 
+        width: camWidth, height: camHeight 
+      });
+      
+      cameraInstance.start().then(() => {
+        camBtn.innerText = "Webcam Running ✔️";
+        camBtn.style.background = "#22c55e";
+        connectServer();
+      });
+    }
+
+    // CONNECT SECURE SERVER
+    function connectServer() {
+      const token = sessionStorage.getItem('jwt_token');
+      
+      // Automatically switch to secure 'wss://' if the browser is using 'https://'
+      const wsProtocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
+      ws = new WebSocket(`${wsProtocol}${window.location.host}/ws?token=${token}`);
+      
+      ws.onopen = () => { document.getElementById('conn_status').innerText = "Online"; document.getElementById('conn_status').style.background = "#22c55e"; };
+      
+      ws.onmessage = (e) => {
+        const data = JSON.parse(e.data);
+        
+        document.getElementById('translatedText').innerText = data.text || "Waiting...";
+        document.getElementById('liveTyping').innerText = "Typing: " + data.current_word;
+        document.getElementById('emotionDisplay').innerText = data.emotion;
+        document.getElementById('confidenceScore').innerText = (data.confidence * 100).toFixed(1) + "%";
+        
+        if (data.current_letter && data.current_letter !== "nothing") {
+            document.getElementById('liveLetter').innerText = data.current_letter.toUpperCase();
+        } else {
+            document.getElementById('liveLetter').innerText = "-";
+        }
+        
+        if (data.completed_word) {
+          document.getElementById('predictedWord').innerText = data.completed_word;
+          document.getElementById('wordMeaning').innerText = "Meaning: " + (data.meaning || "Detecting...");
+        }
+
+        if (data.confidence > 0.90) document.documentElement.style.setProperty('--glow', '#22c55e');
+        else document.documentElement.style.setProperty('--glow', 'transparent');
+
+        if (data.speak && 'speechSynthesis' in window) { 
+            window.speechSynthesis.speak(new SpeechSynthesisUtterance(data.speak)); 
+        }
+      };
+      ws.onclose = () => { document.getElementById('conn_status').innerText = "Offline"; document.getElementById('conn_status').style.background = "#ef4444"; };
+    }
+
+    function sendCommand(cmd) { if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({command: cmd})); }
+  </script>
+</body>
+</html>

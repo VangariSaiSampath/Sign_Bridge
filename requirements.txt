@@ -1,0 +1,12 @@
+fastapi
+uvicorn
+tensorflow-cpu
+numpy
+opencv-python-headless
+mediapipe
+python-jose
+SQLAlchemy==2.0.29
+psycopg2-binary==2.9.9
+deepface
+requests
+websockets
