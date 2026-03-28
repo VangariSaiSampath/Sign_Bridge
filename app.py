@@ -11,7 +11,13 @@ import os
 app = FastAPI()
 
 # --- LOAD ASL MODEL ---
-model = tf.keras.models.load_model("gesture_model.h5")
+import tflite_runtime.interpreter as tflite
+
+interpreter = tflite.Interpreter(model_path="gesture_model.tflite")
+interpreter.allocate_tensors()
+
+input_details = interpreter.get_input_details()
+output_details = interpreter.get_output_details()
 DATA_DIR = "data/asl_alphabet_train/asl_alphabet_train"
 labels = sorted(os.listdir(DATA_DIR))
 
@@ -80,6 +86,10 @@ async def websocket_endpoint(websocket: WebSocket):
                 p = model(np.array([coords]), training=False).numpy()
                 confidence = float(np.max(p))
                 action["confidence"] = confidence
+                input_data = np.array([coords], dtype=np.float32)
+                interpreter.set_tensor(input_details[0]['index'], input_data)
+                interpreter.invoke()
+                p = interpreter.get_tensor(output_details[0]['index'])[0]
                 
                 if confidence > config["threshold"]:
                     char = labels[np.argmax(p)]
