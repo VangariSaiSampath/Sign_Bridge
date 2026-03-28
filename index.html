@@ -71,7 +71,7 @@
     .live-badge { background: #020617; border: 1px solid rgba(96,165,250,0.3); border-radius: 12px; padding: 10px 20px; text-align: center; min-width: 80px;}
     .live-badge h1 { color: #22c55e; font-size: 42px; line-height: 1; margin: 0; text-transform: uppercase;}
 
-    /* Auth Layout specific for 2 columns */
+    /* Auth Layout */
     @media (max-width: 768px) {
         .auth-container { grid-template-columns: 1fr !important; }
         .grid-2 { grid-template-columns: 1fr !important; }
@@ -401,14 +401,12 @@
       canvasCtx.restore();
     });
 
-    // START SMART WEBCAM (Adapts to Mobile vs Laptop)
+    // START SMART WEBCAM//
     function startWebcam() {
       const camBtn = document.getElementById('camBtn');
       camBtn.innerText = "Starting...";
       camBtn.disabled = true;
 
-      // Detect if device is a phone/tablet. 
-      // Uses 640x480 for mobile to prevent lag, 1280x720 HD for laptops.
       const isMobile = window.innerWidth <= 768;
       const camWidth = isMobile ? 640 : 1280;
       const camHeight = isMobile ? 480 : 720;
@@ -425,11 +423,10 @@
       });
     }
 
-    // CONNECT SECURE SERVER
+    // CONNECT SECURE
     function connectServer() {
       const token = sessionStorage.getItem('jwt_token');
       
-      // Automatically switch to secure 'wss://' if the browser is using 'https://'
       const wsProtocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
       ws = new WebSocket(`${wsProtocol}${window.location.host}/ws?token=${token}`);
       
