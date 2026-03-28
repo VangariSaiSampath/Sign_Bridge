@@ -1,6 +1,6 @@
 fastapi
 uvicorn
-numpy
+numpy<2.0.0
 opencv-python-headless
 mediapipe
 python-jose
