@@ -6,6 +6,13 @@ import base64
 import cv2
 import threading
 import os
+from fastapi import FastAPI
+
+app = FastAPI()
+
+@app.get("/")
+def root():
+    return {"status": "SignBridge running"}
 
 
 MODEL_PATH = "gesture_model_optimized.tflite"
@@ -17,12 +24,20 @@ app = FastAPI()
 
 # --- LOAD ASL MODEL ---
 import tflite_runtime.interpreter as tflite
+try:
+    interpreter = tf.lite.Interpreter(model_path="gesture_model_optimized.tflite")
+    interpreter.allocate_tensors()
 
-interpreter = tf.lite.Interpreter(model_path="gesture_model_optimized.tflite")
-interpreter.allocate_tensors()
+    input_details = interpreter.get_input_details()
+    output_details = interpreter.get_output_details()
 
-input_details = interpreter.get_input_details()
-output_details = interpreter.get_output_details()
+    labels = np.load("labels.npy", allow_pickle=True)
+
+    print("✅ Model loaded successfully")
+
+except Exception as e:
+    print("❌ Model loading failed:", e)
+
 DATA_DIR = "data/asl_alphabet_train/asl_alphabet_train"
 labels = sorted(os.listdir(DATA_DIR))
 
