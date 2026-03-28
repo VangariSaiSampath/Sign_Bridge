@@ -2,7 +2,6 @@ import numpy as np
 import tensorflow as tf
 from fastapi import FastAPI, WebSocket
 from fastapi.responses import HTMLResponse
-from deepface import DeepFace
 import base64
 import cv2
 import threading
@@ -29,15 +28,6 @@ counter = 0
 current_emotion = "neutral"
 no_hand_count = 0
 
-def run_emotion_async(img, threshold):
-    global current_emotion
-    try:
-        res = DeepFace.analyze(img, actions=['emotion'], enforce_detection=False, silent=True)
-        # Only update if the dominant emotion is above the user's slider threshold
-        score = res[0]['emotion'][res[0]['dominant_emotion']]
-        if score >= (threshold * 100):
-            current_emotion = res[0]['dominant_emotion']
-    except: pass
 
 @app.get("/")
 async def get():
