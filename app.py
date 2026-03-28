@@ -11,7 +11,7 @@ import os
 app = FastAPI()
 
 # --- LOAD ASL MODEL ---
-model = tf.keras.models.load_model("model/gesture_model.h5")
+model = tf.keras.models.load_model("gesture_model.h5")
 DATA_DIR = "data/asl_alphabet_train/asl_alphabet_train"
 labels = sorted(os.listdir(DATA_DIR))
 
