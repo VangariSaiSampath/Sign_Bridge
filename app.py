@@ -82,8 +82,7 @@ try:
     input_details = interpreter.get_input_details()
     output_details = interpreter.get_output_details()
 
-    DATA_DIR = "data/asl_alphabet_train/asl_alphabet_train"
-    labels = sorted(os.listdir(DATA_DIR))
+    labels = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'del', 'nothing', 'space']
     print(f"✅ TFLite Model and {len(labels)} labels loaded successfully.")
 except Exception as e:
     print(f"❌ Error loading model: {e}")
