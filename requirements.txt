@@ -9,3 +9,4 @@ psycopg2-binary==2.9.9
 requests
 websockets
 tflite-runtime
+tensorflow-cpu==2.15.0
