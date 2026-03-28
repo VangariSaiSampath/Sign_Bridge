@@ -1,193 +1,112 @@
 import numpy as np
-import tflite_runtime.interpreter as tflite
-from fastapi import FastAPI, WebSocket, HTTPException, Depends
+import tensorflow as tf
+from fastapi import FastAPI, WebSocket
 from fastapi.responses import HTMLResponse
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-from jose import jwt
-from datetime import datetime, timedelta
+from deepface import DeepFace
+import base64
+import cv2
+import threading
 import os
-import traceback
-
-# --- DB ---
-from sqlalchemy import create_engine, Column, Integer, String, DateTime
-from sqlalchemy.orm import sessionmaker, declarative_base
-
-SECRET_KEY = "signbridge_secret"
-ALGORITHM = "HS256"
 
 app = FastAPI()
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# --- LOAD ASL MODEL ---
+model = tf.keras.models.load_model("model/gesture_model.h5")
+DATA_DIR = "data/asl_alphabet_train/asl_alphabet_train"
+labels = sorted(os.listdir(DATA_DIR))
 
-# DB
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./signbridge.db")
-if DATABASE_URL.startswith("postgres://"):
-    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
-
-engine = create_engine(DATABASE_URL)
-SessionLocal = sessionmaker(bind=engine)
-Base = declarative_base()
-
-class UserDB(Base):
-    __tablename__ = "users"
-    username = Column(String, primary_key=True)
-    password = Column(String)
-
-class HistoryDB(Base):
-    __tablename__ = "history"
-    id = Column(Integer, primary_key=True)
-    username = Column(String)
-    sentence = Column(String)
-    timestamp = Column(DateTime, default=datetime.utcnow)
-
-Base.metadata.create_all(bind=engine)
-
-# ✅ LOAD MODEL SAFELY
-try:
-    interpreter = tflite.Interpreter(model_path="gesture_model.tflite")
-    interpreter.allocate_tensors()
-
-    input_details = interpreter.get_input_details()
-    output_details = interpreter.get_output_details()
-
-    labels = np.load("labels.npy", allow_pickle=True).tolist()
-
-    print("MODEL INPUT:", input_details)
-    print("MODEL OUTPUT:", output_details)
-    print("LABELS:", len(labels))
-
-    assert output_details[0]['shape'][1] == len(labels), "❌ LABEL MISMATCH"
-
-except Exception as e:
-    print("❌ MODEL LOAD FAILED:", e)
-    interpreter = None
-
-# STATE
+# --- GLOBALS ---
 sentence = ""
 current_word = ""
 last_char = ""
 counter = 0
+current_emotion = "neutral"
 no_hand_count = 0
 
-# AUTH
-class UserAuth(BaseModel):
-    username: str
-    password: str
-
-@app.post("/login")
-async def login(data: UserAuth, db=Depends(lambda: SessionLocal())):
-    user = db.query(UserDB).filter_by(username=data.username, password=data.password).first()
-    if not user:
-        raise HTTPException(status_code=401)
-
-    token = jwt.encode(
-        {"sub": data.username, "exp": datetime.utcnow() + timedelta(hours=5)},
-        SECRET_KEY,
-        algorithm=ALGORITHM,
-    )
-    return {"access_token": token}
+def run_emotion_async(img, threshold):
+    global current_emotion
+    try:
+        res = DeepFace.analyze(img, actions=['emotion'], enforce_detection=False, silent=True)
+        # Only update if the dominant emotion is above the user's slider threshold
+        score = res[0]['emotion'][res[0]['dominant_emotion']]
+        if score >= (threshold * 100):
+            current_emotion = res[0]['dominant_emotion']
+    except: pass
 
 @app.get("/")
-async def home():
-    return HTMLResponse(open("index.html").read())
+async def get():
+    with open("index.html", "r") as f:
+        return HTMLResponse(content=f.read())
 
-# ✅ WEBSOCKET (FIXED)
 @app.websocket("/ws")
-async def ws(ws: WebSocket):
-    global sentence, current_word, last_char, counter, no_hand_count
-
-    token = ws.query_params.get("token")
+async def websocket_endpoint(websocket: WebSocket):
+    global sentence, current_word, last_char, counter, current_emotion, no_hand_count
+    await websocket.accept()
+    
     try:
-        jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-    except:
-        await ws.close()
-        return
-
-    await ws.accept()
-
-    while True:
-        try:
-            data = await ws.receive_json()
-
-            landmarks = data.get("landmarks")
-
-            response = {
-                "text": f"{sentence} {current_word}",
-                "confidence": 0.0,
-                "current_letter": "-",
-                "current_word": current_word,
-            }
-
-            # ❌ MODEL NOT LOADED
-            if interpreter is None:
-                await ws.send_json(response)
+        while True:
+            data = await websocket.receive_json()
+            
+            # --- UI COMMANDS ---
+            cmd = data.get("command")
+            if cmd == "clear":
+                sentence = ""; current_word = ""; continue
+            elif cmd == "backspace":
+                if current_word: current_word = current_word[:-1]
+                elif sentence: sentence = sentence.strip()[:-1]
                 continue
 
+            landmarks = data.get("landmarks")
+            img_data = data.get("image")
+            config = data.get("config", {"threshold": 0.85, "buffer": 5, "emo_threshold": 0.5})
+            
+            action = {"speak": None, "text": "", "emotion": current_emotion, "confidence": 0}
+
+            # 1. EMOTION (Threaded)
+            if img_data:
+                encoded = img_data.split(",", 1)[1]
+                nparr = np.frombuffer(base64.b64decode(encoded), np.uint8)
+                img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+                threading.Thread(target=run_emotion_async, args=(img, config["emo_threshold"]), daemon=True).start()
+
+            # 2. GESTURE LOGIC
             if landmarks:
                 no_hand_count = 0
-
-                # ✅ optimized coords
                 coords = []
-                base_x, base_y = landmarks[0][0], landmarks[0][1]
-
+                bx, by = landmarks[0]['x'], landmarks[0]['y']
                 for lm in landmarks:
-                    coords.extend([
-                        lm[0] - base_x,
-                        lm[1] - base_y,
-                        lm[2]
-                    ])
-
-                input_data = np.array([coords], dtype=np.float32)
-
-                # ✅ SHAPE CHECK
-                if input_data.shape[1] != input_details[0]['shape'][1]:
-                    print("❌ SHAPE MISMATCH:", input_data.shape)
-                    await ws.send_json(response)
-                    continue
-
-                interpreter.set_tensor(input_details[0]['index'], input_data)
-                interpreter.invoke()
-
-                output = interpreter.get_tensor(output_details[0]['index'])[0]
-
-                confidence = float(np.max(output))
-                response["confidence"] = confidence
-
-                if confidence > 0.85:
-                    char = labels[np.argmax(output)]
-                    response["current_letter"] = char
-
+                    coords.extend([lm['x'] - bx, lm['y'] - by, lm['z']])
+                
+                p = model(np.array([coords]), training=False).numpy()
+                confidence = float(np.max(p))
+                action["confidence"] = confidence
+                
+                if confidence > config["threshold"]:
+                    char = labels[np.argmax(p)]
                     if char == last_char:
                         counter += 1
                     else:
-                        last_char = char
-                        counter = 0
-
-                    if counter > 3:
-                        current_word += char
-                        response["current_word"] = current_word
-
+                        last_char = char; counter = 0
+                    
+                    if counter == config["buffer"]:
+                        if char not in ['nothing', 'space', 'del']:
+                            current_word += char
+                            action["speak"] = char
+                        elif char == 'space':
+                            action["speak"] = current_word
+                            sentence += current_word + " "
+                            current_word = ""
             else:
-                # ✅ RESET FIX
                 no_hand_count += 1
-                response["confidence"] = 0.0
-                response["current_letter"] = "-"
-
-                if no_hand_count > 5:
+                if no_hand_count == 15 and current_word != "":
+                    action["speak"] = current_word
+                    sentence += current_word + " "
+                    current_word = ""
                     last_char = ""
 
-            response["text"] = f"{sentence} {current_word}"
+            action["text"] = f"{sentence} {current_word}"
+            action["emotion"] = current_emotion
+            await websocket.send_json(action)
 
-            await ws.send_json(response)
-
-        except Exception as e:
-            print("WS ERROR:", e)
-            traceback.print_exc()
-            break
+    except Exception: pass
+    
