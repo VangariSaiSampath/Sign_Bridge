@@ -249,219 +249,158 @@
 
   <script>
     let ws = null;
+    let reconnectTimer = null;
     let cameraInstance = null;
     let lastEmo = 0;
-
+    
     const videoElement = document.getElementById('input_video');
     const canvasElement = document.getElementById('output_canvas');
     const canvasCtx = canvasElement.getContext('2d');
     const accSlider = document.getElementById('acc_slider');
     const speedSlider = document.getElementById('speed_slider');
-
+    
     accSlider.oninput = () => document.getElementById('acc_val').innerText = accSlider.value;
     speedSlider.oninput = () => document.getElementById('speed_val').innerText = speedSlider.value;
-
-    function showToast(type, message) {
-      const t = document.getElementById('toast');
-      t.className = `toast ${type}`; t.textContent = message;
-      setTimeout(() => t.className = 'toast hidden', 2500);
-    }
-
-    window.onload = () => {
+    
+    // ✅ WEBSOCKET CONNECT WITH AUTO-RECONNECT
+    function connectServer() {
       const token = sessionStorage.getItem('jwt_token');
-      if (token) {
-        document.getElementById('authPage').classList.add('hidden');
-        document.getElementById('dashboardPage').classList.remove('hidden');
-        document.getElementById('welcomeUser').innerText = `Welcome, ${sessionStorage.getItem('username')}`;
-      } else {
-        sessionStorage.clear(); 
-      }
-    };
-
-    function switchAuth(mode) {
-      document.getElementById('loginFields').classList.toggle('hidden', mode !== 'login');
-      document.getElementById('signupFields').classList.toggle('hidden', mode !== 'signup');
-      document.getElementById('tabLogin').classList.toggle('active', mode === 'login');
-      document.getElementById('tabSignup').classList.toggle('active', mode === 'signup');
+      const wsProtocol = location.protocol === 'https:' ? 'wss://' : 'ws://';
+    
+      if (ws) ws.close();
+    
+      ws = new WebSocket(`${wsProtocol}${location.host}/ws?token=${token}`);
+    
+      ws.onopen = () => {
+        console.log("✅ Connected");
+        document.getElementById('conn_status').innerText = "Online";
+        document.getElementById('conn_status').style.background = "#22c55e";
+        if (reconnectTimer) clearTimeout(reconnectTimer);
+      };
+    
+      ws.onclose = () => {
+        console.log("❌ Disconnected. Reconnecting...");
+        document.getElementById('conn_status').innerText = "Offline";
+        document.getElementById('conn_status').style.background = "#ef4444";
+    
+        reconnectTimer = setTimeout(connectServer, 2000); // 🔥 AUTO RECONNECT
+      };
+    
+      ws.onerror = () => {
+        ws.close();
+      };
+    
+      ws.onmessage = (e) => {
+        const data = JSON.parse(e.data);
+    
+        // ✅ SAFE UI UPDATES
+        document.getElementById('translatedText').innerText = data.text || "";
+        document.getElementById('liveTyping').innerText = "Typing: " + (data.current_word || "");
+    
+        document.getElementById('confidenceScore').innerText =
+          ((data.confidence || 0) * 100).toFixed(1) + "%";
+    
+        // ✅ LETTER DISPLAY FIX
+        if (data.current_letter && data.current_letter !== "nothing") {
+          document.getElementById('liveLetter').innerText = data.current_letter.toUpperCase();
+        } else {
+          document.getElementById('liveLetter').innerText = "-";
+        }
+    
+        // ✅ WORD UPDATE
+        if (data.completed_word) {
+          document.getElementById('predictedWord').innerText = data.completed_word;
+          document.getElementById('wordMeaning').innerText =
+            "Meaning: " + (data.meaning || "Detecting...");
+        }
+    
+        // ✅ GLOW EFFECT
+        if ((data.confidence || 0) > 0.9) {
+          document.documentElement.style.setProperty('--glow', '#22c55e');
+        } else {
+          document.documentElement.style.setProperty('--glow', 'transparent');
+        }
+    
+        // ✅ SPEECH
+        if (data.speak && 'speechSynthesis' in window) {
+          window.speechSynthesis.cancel();
+          window.speechSynthesis.speak(new SpeechSynthesisUtterance(data.speak));
+        }
+      };
     }
-
-    function togglePassword(inputId, btn) {
-      const input = document.getElementById(inputId);
-      if (input.type === 'password') {
-        input.type = 'text'; btn.innerText = '👁️‍🗨️'; 
-      } else {
-        input.type = 'password'; btn.innerText = '👁️';
-      }
-    }
-
-    async function handleAuth(mode) {
-      const u = document.getElementById(mode === 'login' ? 'logU' : 'sigU').value.trim();
-      const p = document.getElementById(mode === 'login' ? 'logP' : 'sigP').value.trim();
-      if(!u || !p) return showToast('error', 'Fields cannot be empty');
-
-      try {
-        const res = await fetch(mode === 'login' ? '/login' : '/signup', {
-          method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({username: u, password: p})
-        });
-        const data = await res.json();
-        if(res.ok) {
-          if(mode === 'login') {
-            sessionStorage.setItem('jwt_token', data.access_token);
-            sessionStorage.setItem('username', u);
-            window.location.reload();
-          } else {
-            showToast('success', 'Account created! Please login.');
-            document.getElementById('logU').value = u; document.getElementById('logP').value = p;
-            switchAuth('login');
-          }
-        } else { showToast('error', data.detail || 'Authentication failed'); }
-      } catch(e) { showToast('error', 'Server error'); }
-    }
-
-    function logoutUser() {
-      sessionStorage.clear();
-      window.location.reload();
-    }
-
-    function switchPage(page) {
-      ['dashboard', 'history', 'vocab'].forEach(p => {
-        document.getElementById(`page-${p}`).classList.add('hidden');
-        document.getElementById(`nav-${p}`).classList.remove('active');
-      });
-      document.getElementById(`page-${page}`).classList.remove('hidden');
-      document.getElementById(`nav-${page}`).classList.add('active');
-      const titles = { 'dashboard': 'Dashboard', 'history': 'Translation History', 'vocab': 'Vocabulary Settings' };
-      document.getElementById('pageTitle').innerText = titles[page];
-      if(page === 'history') loadHistory();
-      if(page === 'vocab') loadVocab();
-    }
-
-    function toggleSettings() {
-      const panel = document.getElementById('settings-panel');
-      const icon = document.getElementById('settings-icon');
-      panel.classList.toggle('hidden');
-      icon.innerText = panel.classList.contains('hidden') ? '▼' : '▲';
-    }
-
-    async function loadHistory() {
-      try {
-        const res = await fetch('/api/history'); const data = await res.json();
-        const tbody = document.getElementById('historyTableBody'); tbody.innerHTML = "";
-        if(data.length === 0) tbody.innerHTML = `<tr><td colspan="2" style="text-align:center;">No history yet.</td></tr>`;
-        
-        data.forEach(row => {
-          const localTime = new Date(row.time.replace(' ', 'T') + 'Z').toLocaleString();
-          tbody.innerHTML += `<tr><td style="color:#94a3b8;">${localTime}</td><td style="font-weight:bold; color:white;">${row.sentence}</td></tr>`;
-        });
-      } catch (e) { showToast('error', 'Failed to load history'); }
-    }
-
-    async function loadVocab() {
-      try {
-        const res = await fetch('/api/vocab'); const data = await res.json();
-        const tbody = document.getElementById('vocabTableBody'); tbody.innerHTML = "";
-        if (data.length === 0) return tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;">No words saved yet.</td></tr>`;
-        data.forEach(row => tbody.innerHTML += `<tr><td style="font-weight:bold; color:#60a5fa; font-size:18px;">${row.word}</td><td style="color:white; font-size:14px; padding-right:15px;">${row.meaning}</td><td><button class="btn btn-danger" style="padding: 6px 10px; font-size:12px;" onclick="deleteVocab(${row.id})">Remove</button></td></tr>`);
-      } catch (e) { showToast('error', 'Failed to load vocabulary'); }
-    }
-
-    async function saveCurrentWordToVocab() {
-      const word = document.getElementById('predictedWord').innerText;
-      const meaningText = document.getElementById('wordMeaning').innerText.replace("Meaning: ", "");
-      if (word === "..." || !word) return showToast('error', 'No word to save!');
-      try {
-        const res = await fetch('/api/vocab', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: sessionStorage.getItem('username') || "User", word: word, meaning: meaningText }) });
-        if (res.ok) showToast('success', `${word} saved to Vocabulary!`);
-      } catch (e) { showToast('error', 'Failed to save word'); }
-    }
-
-    async function deleteVocab(id) {
-      try {
-        const res = await fetch(`/api/vocab/${id}`, { method: 'DELETE' });
-        if (res.ok) { showToast('success', 'Word removed'); loadVocab(); }
-      } catch (e) { showToast('error', 'Failed to remove word'); }
-    }
-
-    const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
-    hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.6, minTrackingConfidence: 0.6 });
-
+    
+    // ✅ MEDIAPIPE SETUP
+    const hands = new Hands({
+      locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+    });
+    
+    hands.setOptions({
+      maxNumHands: 1,
+      modelComplexity: 1,
+      minDetectionConfidence: 0.6,
+      minTrackingConfidence: 0.6
+    });
+    
+    // ✅ OPTIMIZED LANDMARK SEND (MAJOR FIX)
     hands.onResults((results) => {
       canvasCtx.save();
       canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
       canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
-      
-      let payload = { landmarks: null, image: null, config: { threshold: parseFloat(accSlider.value) / 100, buffer: parseInt(speedSlider.value), emo_threshold: 0.5 } };
+    
+      let payload = {
+        landmarks: null,
+        config: {
+          threshold: parseFloat(accSlider.value) / 100,
+          buffer: parseInt(speedSlider.value)
+        }
+      };
+    
       if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-        drawConnectors(canvasCtx, results.multiHandLandmarks[0], HAND_CONNECTIONS, {color: '#00FF00', lineWidth: 4});
-        drawLandmarks(canvasCtx, results.multiHandLandmarks[0], {color: '#FF0000', lineWidth: 2});
-        payload.landmarks = results.multiHandLandmarks[0];
+        const lm = results.multiHandLandmarks[0];
+    
+        drawConnectors(canvasCtx, lm, HAND_CONNECTIONS, { color: '#00FF00', lineWidth: 4 });
+        drawLandmarks(canvasCtx, lm, { color: '#FF0000', lineWidth: 2 });
+    
+        // 🔥 OPTIMIZED: SEND ONLY NUMBERS (NOT FULL OBJECT)
+        payload.landmarks = lm.map(p => [p.x, p.y, p.z]);
       }
-      if (Date.now() - lastEmo > 4000) { payload.image = canvasElement.toDataURL('image/jpeg', 0.3); lastEmo = Date.now(); }
-      if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(payload));
+    
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify(payload));
+      }
+    
       canvasCtx.restore();
     });
-
-    // START SMART WEBCAM//
+    
+    // ✅ START CAMERA
     function startWebcam() {
       const camBtn = document.getElementById('camBtn');
       camBtn.innerText = "Starting...";
       camBtn.disabled = true;
-
+    
       const isMobile = window.innerWidth <= 768;
       const camWidth = isMobile ? 640 : 1280;
       const camHeight = isMobile ? 480 : 720;
-
-      cameraInstance = new Camera(videoElement, { 
-        onFrame: async () => { await hands.send({image: videoElement}); }, 
-        width: camWidth, height: camHeight 
+    
+      cameraInstance = new Camera(videoElement, {
+        onFrame: async () => { await hands.send({ image: videoElement }); },
+        width: camWidth,
+        height: camHeight
       });
-      
+    
       cameraInstance.start().then(() => {
         camBtn.innerText = "Webcam Running ✔️";
         camBtn.style.background = "#22c55e";
         connectServer();
       });
     }
-
-    // CONNECT SECURE
-    function connectServer() {
-      const token = sessionStorage.getItem('jwt_token');
-      
-      const wsProtocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
-      ws = new WebSocket(`${wsProtocol}${window.location.host}/ws?token=${token}`);
-      
-      ws.onopen = () => { document.getElementById('conn_status').innerText = "Online"; document.getElementById('conn_status').style.background = "#22c55e"; };
-      
-      ws.onmessage = (e) => {
-        const data = JSON.parse(e.data);
-        
-        document.getElementById('translatedText').innerText = data.text || "Waiting...";
-        document.getElementById('liveTyping').innerText = "Typing: " + data.current_word;
-        document.getElementById('emotionDisplay').innerText = data.emotion;
-        document.getElementById('confidenceScore').innerText = (data.confidence * 100).toFixed(1) + "%";
-        
-        if (data.current_letter && data.current_letter !== "nothing") {
-            document.getElementById('liveLetter').innerText = data.current_letter.toUpperCase();
-        } else {
-            document.getElementById('liveLetter').innerText = "-";
-        }
-        
-        if (data.completed_word) {
-          document.getElementById('predictedWord').innerText = data.completed_word;
-          document.getElementById('wordMeaning').innerText = "Meaning: " + (data.meaning || "Detecting...");
-        }
-
-        if (data.confidence > 0.90) document.documentElement.style.setProperty('--glow', '#22c55e');
-        else document.documentElement.style.setProperty('--glow', 'transparent');
-
-        if (data.speak && 'speechSynthesis' in window) { 
-            window.speechSynthesis.speak(new SpeechSynthesisUtterance(data.speak)); 
-        }
-      };
-      ws.onclose = () => { document.getElementById('conn_status').innerText = "Offline"; document.getElementById('conn_status').style.background = "#ef4444"; };
+    
+    // COMMANDS
+    function sendCommand(cmd) {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ command: cmd }));
+      }
     }
-
-    function sendCommand(cmd) { if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({command: cmd})); }
   </script>
 </body>
 </html>
