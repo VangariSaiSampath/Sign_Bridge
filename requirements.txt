@@ -1,16 +1,12 @@
-cat > requirements.txt << 'EOF'
-fastapi==0.111.0
-uvicorn==0.30.1
-tensorflow-cpu==2.15.0
-tf-keras==2.15.1
-numpy==1.26.4
-opencv-python-headless==4.9.0.80
-mediapipe==0.10.14
-python-jose==3.3.0
+fastapi
+uvicorn
+tensorflow
+tf-keras
+numpy
+opencv-python-headless
+mediapipe
+python-jose
 SQLAlchemy==2.0.29
 psycopg2-binary==2.9.9
-deepface==0.0.93
-retina-face==0.0.17
-requests==2.31.0
-websockets==12.0
-EOF
+requests
+websockets
