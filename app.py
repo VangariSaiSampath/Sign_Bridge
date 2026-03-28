@@ -82,7 +82,8 @@ try:
     input_details = interpreter.get_input_details()
     output_details = interpreter.get_output_details()
 
-    labels = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'del', 'nothing', 'space']
+    labels = np.load("labels.npy", allow_pickle=True)
+
     print(f"✅ TFLite Model and {len(labels)} labels loaded successfully.")
 except Exception as e:
     print(f"❌ Error loading model: {e}")
