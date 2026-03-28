@@ -101,17 +101,6 @@ counter = 0
 current_emotion = "neutral"
 no_hand_count = 0
 
-def run_emotion_async(img, threshold):
-    global current_emotion
-    try:
-        from deepface import DeepFace   # ← lazy load, only when called
-        res = DeepFace.analyze(img, actions=['emotion'], enforce_detection=False, silent=True)
-        score = res[0]['emotion'][res[0]['dominant_emotion']]
-        if score >= (threshold * 100):
-            current_emotion = res[0]['dominant_emotion']
-    except:
-        pass
-
 def get_meaning(word):
     if not word: return ""
     try:
