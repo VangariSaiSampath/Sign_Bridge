@@ -7,12 +7,18 @@ import cv2
 import threading
 import os
 
+
+MODEL_PATH = "gesture_model_optimized.tflite"
+
+if not os.path.exists(MODEL_PATH):
+    raise Exception(f"Model file not found: {MODEL_PATH}")
+
 app = FastAPI()
 
 # --- LOAD ASL MODEL ---
 import tflite_runtime.interpreter as tflite
 
-interpreter = tflite.Interpreter(model_path="gesture_model_optimized.tflite")
+interpreter = tf.lite.Interpreter(model_path="gesture_model_optimized.tflite")
 interpreter.allocate_tensors()
 
 input_details = interpreter.get_input_details()
