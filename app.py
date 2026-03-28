@@ -9,9 +9,17 @@ from datetime import datetime, timedelta
 import base64
 import cv2
 import threading
-import os
 import requests
 import traceback
+# --- RENDER FREE TIER MEMORY SAVERS ---
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' # Disable TF debug logs
+os.environ["CUDA_VISIBLE_DEVICES"] = "-1" # Force CPU only
+
+# Force TensorFlow to only use 1 thread to save RAM
+tf.config.threading.set_inter_op_parallelism_threads(1)
+tf.config.threading.set_intra_op_parallelism_threads(1)
+# --------------------------------------
 
 # --- NEW: SQLAlchemy Imports ---
 from sqlalchemy import create_engine, Column, Integer, String, DateTime
