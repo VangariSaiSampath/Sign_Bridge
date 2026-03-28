@@ -37,8 +37,6 @@ try:
 
 except Exception as e:
     print("❌ Model loading failed:", e)
-
-DATA_DIR = "data/asl_alphabet_train/asl_alphabet_train"
 labels = sorted(os.listdir(DATA_DIR))
 
 # --- GLOBALS ---
