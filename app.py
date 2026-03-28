@@ -10,7 +10,7 @@ import os
 import requests
 import traceback
 
-# --- SQLAlchemy Imports ---
+# --- SQLAlchemy ---
 from sqlalchemy import create_engine, Column, Integer, String, DateTime
 from sqlalchemy.orm import sessionmaker, declarative_base
 
@@ -28,9 +28,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ==========================================
-# DATABASE SETUP (Render PostgreSQL Ready)
-# ==========================================
+
+# DATABASE SETUP (Render PostgreSQL)
+
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./signbridge.db")
 if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
@@ -71,9 +71,7 @@ def get_db():
     finally:
         db.close()
 
-# ==========================================
-# AI & LOGIC GLOBALS (TFLite Engine)
-# ==========================================
+# TFLite Engine
 try:
     # Load TFLite model
     interpreter = tflite.Interpreter(model_path="gesture_model.tflite")
@@ -82,7 +80,7 @@ try:
     input_details = interpreter.get_input_details()
     output_details = interpreter.get_output_details()
 
-    labels = np.load("labels.npy", allow_pickle=True)
+    labels = np.load("labels.npy", allow_pickle=True).tolist()
 
     print(f"✅ TFLite Model and {len(labels)} labels loaded successfully.")
 except Exception as e:
@@ -99,7 +97,6 @@ no_hand_count = 0
 
 def run_emotion_async(img, threshold):
     global current_emotion
-    # DeepFace bypassed for Render Free Tier (Memory Limit constraint)
     current_emotion = "neutral"
 
 def get_meaning(word):
@@ -111,9 +108,9 @@ def get_meaning(word):
     except: pass
     return "No word exists"
 
-# ==========================================
+
 # AUTH & APIS
-# ==========================================
+
 class UserAuth(BaseModel):
     username: str
     password: str
@@ -165,9 +162,7 @@ async def delete_vocab(vocab_id: int, db = Depends(get_db)):
 async def get():
     with open("index.html", "r") as f: return HTMLResponse(content=f.read())
 
-# ==========================================
-# WEBSOCKET ENGINE (TFLite Inference)
-# ==========================================
+#TFLite Inference
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     global sentence, current_word, last_char, counter, current_emotion, no_hand_count, last_completed_word, last_meaning
@@ -217,7 +212,7 @@ async def websocket_endpoint(websocket: WebSocket):
                 for lm in landmarks:
                     coords.extend([lm['x'] - bx, lm['y'] - by, lm['z']])
                 
-                # --- NEW TFLITE PREDICTION LOGIC ---
+                # --- TFLITE PREDICTION LOGIC ---
                 input_data = np.array([coords], dtype=np.float32)
                 interpreter.set_tensor(input_details[0]['index'], input_data)
                 interpreter.invoke()
