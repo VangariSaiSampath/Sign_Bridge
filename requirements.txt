@@ -1,6 +1,7 @@
 fastapi
 uvicorn
-tensorflow-cpu
+tensorflow
+tf-keras
 numpy
 opencv-python-headless
 mediapipe
