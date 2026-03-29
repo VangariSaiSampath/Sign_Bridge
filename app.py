@@ -29,7 +29,7 @@ app.add_middleware(
 )
 
 # ==========================================
-# DATABASE SETUP (Render PostgreSQL Ready)
+# DATABASE SETUP
 # ==========================================
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./signbridge.db")
 if DATABASE_URL.startswith("postgres://"):
@@ -72,34 +72,47 @@ def get_db():
         db.close()
 
 # ==========================================
-# AI & LOGIC GLOBALS (TFLite Engine)
+# AI ENGINE GLOBALS & INITIALIZATION
 # ==========================================
 interpreter = None
 input_details = None
 output_details = None
 labels = []
 
+# Global State for Translation
 sentence = ""
 current_word = ""
 last_char = ""
 last_completed_word = "" 
 last_meaning = ""
 counter = 0
-current_emotion = "neutral"
 no_hand_count = 0
 
-def get_model():
+def load_model_globally():
+    """Initializes the TFLite interpreter and loads labels."""
     global interpreter, input_details, output_details, labels
     if interpreter is None:
         try:
-            interpreter = tflite.Interpreter(model_path="gesture_model_optimized.tflite")
+            model_path = "gesture_model_optimized.tflite"
+            labels_path = "labels.npy"
+            
+            if not os.path.exists(model_path) or not os.path.exists(labels_path):
+                print(f"❌ Critical Error: {model_path} or {labels_path} missing!")
+                return
+
+            interpreter = tflite.Interpreter(model_path=model_path)
             interpreter.allocate_tensors()
             input_details = interpreter.get_input_details()
             output_details = interpreter.get_output_details()
-            labels = np.load("labels.npy", allow_pickle=True).tolist()
-            print("✅ Model loaded successfully")
+            labels = np.load(labels_path, allow_pickle=True).tolist()
+            print(f"✅ TFLite Engine Loaded: {len(labels)} labels ready.")
         except Exception as e:
             print(f"❌ Model load error: {e}")
+            traceback.print_exc()
+
+@app.on_event("startup")
+async def startup_event():
+    load_model_globally()
 
 def get_meaning(word):
     if not word: return ""
@@ -152,9 +165,16 @@ async def get_vocab(db = Depends(get_db)):
     vocab = db.query(VocabDB).order_by(VocabDB.timestamp.desc()).all()
     return [{"id": r.id, "word": r.word, "meaning": r.meaning, "time": r.timestamp.strftime("%Y-%m-%d %H:%M:%S")} for r in vocab]
 
+@app.delete("/api/vocab/{vocab_id}")
+async def delete_vocab(vocab_id: int, db = Depends(get_db)):
+    item = db.query(VocabDB).filter(VocabDB.id == vocab_id).first()
+    if item:
+        db.delete(item)
+        db.commit()
+    return {"status": "success"}
+
 @app.get("/")
 async def get():
-    # Make sure your HTML file is actually named index.html in your folder!
     with open("index.html", "r") as f: return HTMLResponse(content=f.read())
 
 # ==========================================
@@ -162,7 +182,10 @@ async def get():
 # ==========================================
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
-    global sentence, current_word, last_char, counter, current_emotion, no_hand_count, last_completed_word, last_meaning
+    global sentence, current_word, last_char, counter, no_hand_count, last_completed_word, last_meaning
+    
+    # Ensure model is initialized
+    load_model_globally()
     
     token = websocket.query_params.get("token")
     try:
@@ -174,13 +197,11 @@ async def websocket_endpoint(websocket: WebSocket):
 
     await websocket.accept()
     
-    # Load model lazily right after accepting the connection
-    get_model()
-    
     try:
         while True:
             data = await websocket.receive_json()
             
+            # Command Handling
             cmd = data.get("command")
             if cmd == "clear":
                 if sentence.strip():
@@ -196,23 +217,24 @@ async def websocket_endpoint(websocket: WebSocket):
                 continue
 
             landmarks = data.get("landmarks")
-            config = data.get("config", {"threshold": 0.85, "buffer": 5, "emo_threshold": 0.5})
+            config = data.get("config", {"threshold": 0.85, "buffer": 5})
             
             action = {
-                "speak": None, "text": f"{sentence} {current_word}", "emotion": current_emotion, 
+                "speak": None, "text": f"{sentence} {current_word}",
                 "confidence": 0.0, "meaning": last_meaning, 
                 "completed_word": last_completed_word, "current_word": current_word,
                 "current_letter": "-" 
             }
 
-            if landmarks and interpreter is not None:
+            if landmarks and interpreter:
                 no_hand_count = 0
                 coords = []
-                bx, by = landmarks[0]['x'], landmarks[0]['y']
+                # index.html sends landmarks as [ [x,y,z], [x,y,z]... ]
+                bx, by = landmarks[0][0], landmarks[0][1]
                 for lm in landmarks:
-                    coords.extend([lm['x'] - bx, lm['y'] - by, lm['z']])
+                    coords.extend([lm[0] - bx, lm[1] - by, lm[2]])
                 
-                # Inference
+                # TFLite Inference
                 input_data = np.array([coords], dtype=np.float32)
                 interpreter.set_tensor(input_details[0]['index'], input_data)
                 interpreter.invoke()
@@ -231,33 +253,37 @@ async def websocket_endpoint(websocket: WebSocket):
                     else:
                         last_char = char; counter = 0
                     
-                    if counter == config["buffer"]:
+                    if counter >= config["buffer"]:
                         if char not in ['nothing', 'space', 'del']:
                             current_word += char
                             action["current_word"] = current_word
                             action["speak"] = char 
+                            counter = 0 # Reset after registering
                             
                         elif char == 'space' and current_word != "":
                             last_completed_word = current_word
                             last_meaning = get_meaning(last_completed_word)
-                            action["speak"] = last_completed_word if last_meaning != "No word exists" else "No word exists"
+                            action["speak"] = last_completed_word if last_meaning != "No word exists" else "Word not found"
                             sentence += current_word + " "
                             current_word = ""
+                            counter = 0
             else:
+                # No hands detected logic
                 no_hand_count += 1
-                if no_hand_count == 15 and current_word != "":
+                if no_hand_count > 15 and current_word != "":
                     last_completed_word = current_word
                     last_meaning = get_meaning(last_completed_word)
-                    action["speak"] = last_completed_word if last_meaning != "No word exists" else "No word exists"
+                    action["speak"] = last_completed_word
                     sentence += current_word + " "
                     current_word = ""
                     last_char = ""
+                    no_hand_count = 0
 
-            action["text"] = f"{sentence} {current_word}"
+            action["text"] = f"{sentence} {current_word}".strip()
             action["completed_word"] = last_completed_word
             action["meaning"] = last_meaning
             await websocket.send_json(action)
 
     except Exception as e:
-        print(f"WebSocket processing error: {e}")
+        print(f"❌ WebSocket error: {e}")
         traceback.print_exc()
