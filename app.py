@@ -81,21 +81,25 @@ output_details = None
 labels = []
 
 def get_model():
-    global interpreter, labels
+    global interpreter, input_details, output_details, labels
     if interpreter is None:
         try:
             interpreter = tflite.Interpreter(model_path="gesture_model_optimized.tflite")
             interpreter.allocate_tensors()
+            input_details = interpreter.get_input_details()
+            output_details = interpreter.get_output_details()
             labels = np.load("labels.npy", allow_pickle=True).tolist()
             print("✅ Model loaded successfully")
         except Exception as e:
             print(f"❌ Model load error: {e}")
     return interpreter, labels
 
-# In your WebSocket endpoint, call load_model() at the start
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
-    model, model_labels = get_model()
+    global sentence, current_word, last_char, counter, current_emotion, no_hand_count, last_completed_word, last_meaning
+    
+    get_model()
+
 sentence = ""
 current_word = ""
 last_char = ""
