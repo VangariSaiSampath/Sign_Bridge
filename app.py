@@ -9,8 +9,6 @@ from datetime import datetime, timedelta
 import os
 import requests
 import traceback
-
-# --- SQLAlchemy Imports ---
 from sqlalchemy import create_engine, Column, Integer, String, DateTime
 from sqlalchemy.orm import sessionmaker, declarative_base
 
@@ -19,268 +17,133 @@ SECRET_KEY = "signbridge_secret"
 ALGORITHM = "HS256"
 
 app = FastAPI()
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"], 
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# ==========================================
-# DATABASE SETUP
-# ==========================================
+# --- DATABASE ---
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./signbridge.db")
-if DATABASE_URL.startswith("postgres://"):
-    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
-
-engine = create_engine(
-    DATABASE_URL, 
-    connect_args={"check_same_thread": False} if "sqlite" in DATABASE_URL else {}
-)
+if DATABASE_URL.startswith("postgres://"): DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False} if "sqlite" in DATABASE_URL else {})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
 class UserDB(Base):
     __tablename__ = "users"
-    username = Column(String, primary_key=True, index=True)
+    username = Column(String, primary_key=True)
     password = Column(String)
 
 class HistoryDB(Base):
     __tablename__ = "history"
     id = Column(Integer, primary_key=True, autoincrement=True)
-    username = Column(String, index=True)
+    username = Column(String)
     sentence = Column(String)
-    timestamp = Column(DateTime, default=datetime.utcnow)
-
-class VocabDB(Base):
-    __tablename__ = "vocabulary"
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    username = Column(String, index=True)
-    word = Column(String)
-    meaning = Column(String)
     timestamp = Column(DateTime, default=datetime.utcnow)
 
 Base.metadata.create_all(bind=engine)
 
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-# ==========================================
-# AI ENGINE GLOBALS & INITIALIZATION
-# ==========================================
+# --- AI ENGINE GLOBALS ---
 interpreter = None
 input_details = None
 output_details = None
 labels = []
 
-# Global State for Translation
+# Translation State
 sentence = ""
 current_word = ""
 last_char = ""
-last_completed_word = "" 
-last_meaning = ""
 counter = 0
 no_hand_count = 0
+last_completed_word = ""
+last_meaning = ""
 
-def load_model_globally():
-    """Ensures the TFLite model is loaded into memory correctly."""
+def load_model():
     global interpreter, input_details, output_details, labels
     if interpreter is None:
-        try:
-            model_path = "gesture_model_optimized.tflite"
-            labels_path = "labels.npy"
-            
-            if not os.path.exists(model_path) or not os.path.exists(labels_path):
-                print(f"❌ Missing files: {model_path} or {labels_path}")
-                return
-
-            interpreter = tflite.Interpreter(model_path=model_path)
-            interpreter.allocate_tensors()
-            input_details = interpreter.get_input_details()
-            output_details = interpreter.get_output_details()
-            labels = np.load(labels_path, allow_pickle=True).tolist()
-            print("✅ TFLite Engine Initialized")
-        except Exception as e:
-            print(f"❌ Model load error: {e}")
-
-@app.on_event("startup")
-async def startup_event():
-    load_model_globally()
+        interpreter = tflite.Interpreter(model_path="gesture_model_optimized.tflite")
+        interpreter.allocate_tensors()
+        input_details = interpreter.get_input_details()
+        output_details = interpreter.get_output_details()
+        labels = np.load("labels.npy", allow_pickle=True).tolist()
 
 def get_meaning(word):
-    if not word: return ""
     try:
-        r = requests.get(f"https://api.dictionaryapi.dev/api/v2/entries/en/{word}", timeout=2)
-        if r.status_code == 200:
-            return r.json()[0]['meanings'][0]['definitions'][0]['definition']
-    except: pass
-    return "No word exists"
+        r = requests.get(f"https://api.dictionaryapi.dev/api/v2/entries/en/{word}", timeout=1)
+        return r.json()[0]['meanings'][0]['definitions'][0]['definition']
+    except: return "Definition not found"
 
-# ==========================================
-# AUTH & APIS
-# ==========================================
-class UserAuth(BaseModel):
-    username: str
-    password: str
+@app.on_event("startup")
+async def startup(): load_model()
 
 @app.post("/signup")
-async def signup(data: UserAuth, db = Depends(get_db)):
-    existing_user = db.query(UserDB).filter(UserDB.username == data.username).first()
-    if existing_user:
-        raise HTTPException(status_code=400, detail="Username already exists")
-    new_user = UserDB(username=data.username, password=data.password)
-    db.add(new_user)
+async def signup(u: dict):
+    db = SessionLocal()
+    db.add(UserDB(username=u['username'], password=u['password']))
     db.commit()
-    return {"status": "success"}
+    return {"status": "ok"}
 
 @app.post("/login")
-async def login(data: UserAuth, db = Depends(get_db)):
-    user = db.query(UserDB).filter(UserDB.username == data.username, UserDB.password == data.password).first()
-    if user:
-        token = jwt.encode({"sub": data.username, "exp": datetime.utcnow() + timedelta(hours=2)}, SECRET_KEY, algorithm=ALGORITHM)
-        return {"access_token": token}
-    raise HTTPException(status_code=401, detail="Invalid credentials")
+async def login(u: dict):
+    db = SessionLocal()
+    user = db.query(UserDB).filter(UserDB.username == u['username'], UserDB.password == u['password']).first()
+    if not user: raise HTTPException(401)
+    token = jwt.encode({"sub": u['username'], "exp": datetime.utcnow()+timedelta(hours=2)}, SECRET_KEY, ALGORITHM)
+    return {"access_token": token}
 
-@app.get("/api/history")
-async def get_history(db = Depends(get_db)):
-    history = db.query(HistoryDB).order_by(HistoryDB.timestamp.desc()).limit(20).all()
-    return [{"sentence": r.sentence, "time": r.timestamp.strftime("%Y-%m-%d %H:%M:%S")} for r in history]
-
-@app.post("/api/vocab")
-async def add_vocab(item: dict, db = Depends(get_db)):
-    new_vocab = VocabDB(username=item.get('username'), word=item.get('word'), meaning=item.get('meaning'))
-    db.add(new_vocab)
-    db.commit()
-    return {"status": "success"}
-
-@app.get("/api/vocab")
-async def get_vocab(db = Depends(get_db)):
-    vocab = db.query(VocabDB).order_by(VocabDB.timestamp.desc()).all()
-    return [{"id": r.id, "word": r.word, "meaning": r.meaning, "time": r.timestamp.strftime("%Y-%m-%d %H:%M:%S")} for r in vocab]
-
-@app.delete("/api/vocab/{vocab_id}")
-async def delete_vocab(vocab_id: int, db = Depends(get_db)):
-    item = db.query(VocabDB).filter(VocabDB.id == vocab_id).first()
-    if item:
-        db.delete(item)
-        db.commit()
-    return {"status": "success"}
-
-@app.get("/")
-async def get():
-    with open("index.html", "r") as f: return HTMLResponse(content=f.read())
-
-# ==========================================
-# WEBSOCKET ENGINE (TFLite Inference)
-# ==========================================
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     global sentence, current_word, last_char, counter, no_hand_count, last_completed_word, last_meaning
-    
-    load_model_globally()
-    
-    token = websocket.query_params.get("token")
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        username = payload.get("sub")
-    except:
-        await websocket.close(code=1008)
-        return
-
     await websocket.accept()
-    
     try:
         while True:
             data = await websocket.receive_json()
+            if data.get("command") == "clear":
+                sentence = ""; current_word = ""; continue
             
-            cmd = data.get("command")
-            if cmd == "clear":
-                if sentence.strip():
-                    db = SessionLocal()
-                    new_hist = HistoryDB(username=username, sentence=sentence.strip())
-                    db.add(new_hist)
-                    db.commit()
-                    db.close()
-                sentence = ""; current_word = ""; last_completed_word = ""; last_meaning = ""; continue
-            elif cmd == "backspace":
-                if current_word: current_word = current_word[:-1]
-                elif sentence: sentence = sentence.strip()[:-1]
-                continue
-
             landmarks = data.get("landmarks")
-            config = data.get("config", {"threshold": 0.85, "buffer": 5})
-            
-            action = {
-                "speak": None, "text": f"{sentence} {current_word}",
-                "confidence": 0.0, "meaning": last_meaning, 
-                "completed_word": last_completed_word, "current_word": current_word,
-                "current_letter": "-" 
-            }
+            conf_threshold = data.get("config", {}).get("threshold", 0.85)
+            buffer_val = data.get("config", {}).get("buffer", 5)
 
-            if landmarks and interpreter:
+            resp = {"text": f"{sentence} {current_word}".strip(), "speak": None, "current_letter": "-"}
+
+            if landmarks:
                 no_hand_count = 0
                 coords = []
-                # Match the [ [x,y,z], ... ] format from index.html
-                bx, by = landmarks[0][0], landmarks[0][1]
-                for lm in landmarks:
-                    coords.extend([lm[0] - bx, lm[1] - by, lm[2]])
+                base_x, base_y = landmarks[0][0], landmarks[0][1]
+                for lm in landmarks: coords.extend([lm[0]-base_x, lm[1]-base_y, lm[2]])
                 
-                input_data = np.array([coords], dtype=np.float32)
-                interpreter.set_tensor(input_details[0]['index'], input_data)
+                interpreter.set_tensor(input_details[0]['index'], np.array([coords], dtype=np.float32))
                 interpreter.invoke()
+                output = interpreter.get_tensor(output_details[0]['index'])[0]
                 
-                output_data = interpreter.get_tensor(output_details[0]['index'])
-                p = output_data[0]
-                confidence = float(np.max(p))
-                action["confidence"] = confidence
+                idx = np.argmax(output)
+                conf = float(output[idx])
                 
-                if confidence > config["threshold"]:
-                    char = labels[np.argmax(p)]
-                    action["current_letter"] = char 
+                if conf > conf_threshold:
+                    char = labels[idx]
+                    resp["current_letter"] = char
+                    if char == last_char: counter += 1
+                    else: last_char = char; counter = 0
                     
-                    if char == last_char:
-                        counter += 1
-                    else:
-                        last_char = char
-                        counter = 0
-                    
-                    # 🔥 FIX: Reset counter to 0 after confirming a character
-                    if counter >= config["buffer"]:
+                    if counter >= buffer_val:
                         if char not in ['nothing', 'space', 'del']:
                             current_word += char
-                            action["current_word"] = current_word
-                            action["speak"] = char 
-                            counter = 0 
-                            
-                        elif char == 'space' and current_word != "":
+                            resp["speak"] = char
+                            counter = 0 # RESET: Prevents runaway letters
+                        elif char == 'space':
                             last_completed_word = current_word
-                            last_meaning = get_meaning(last_completed_word)
-                            action["speak"] = last_completed_word if last_meaning != "No word exists" else "No word exists"
                             sentence += current_word + " "
-                            current_word = ""
-                            counter = 0
+                            current_word = ""; counter = 0
             else:
+                # FIX: AUTO-SPEAK ON HAND REMOVAL
                 no_hand_count += 1
-                if no_hand_count > 15 and current_word != "":
+                if no_hand_count == 15 and current_word != "":
                     last_completed_word = current_word
                     last_meaning = get_meaning(last_completed_word)
-                    action["speak"] = last_completed_word
+                    resp["speak"] = last_completed_word
+                    resp["completed_word"] = last_completed_word
+                    resp["meaning"] = last_meaning
                     sentence += current_word + " "
-                    current_word = ""
-                    last_char = ""
-                    no_hand_count = 0
+                    current_word = ""; last_char = ""; no_hand_count = 0
 
-            action["text"] = f"{sentence} {current_word}".strip()
-            action["completed_word"] = last_completed_word
-            action["meaning"] = last_meaning
-            await websocket.send_json(action)
-
-    except Exception as e:
-        print(f"❌ WebSocket error: {e}")
-        traceback.print_exc()
+            resp["text"] = f"{sentence} {current_word}".strip()
+            await websocket.send_json(resp)
+    except: pass
