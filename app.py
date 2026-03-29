@@ -19,7 +19,7 @@ MODEL_PATH = "gesture_model_optimized.tflite"
 if not os.path.exists(MODEL_PATH):
     raise Exception(f"Model file not found: {MODEL_PATH}")
 
-# --- LOAD ASL MODEL ---
+# --- MODEL ---
 import tflite_runtime.interpreter as tflite
 try:
     interpreter = tf.lite.Interpreter(model_path="gesture_model_optimized.tflite")
@@ -35,7 +35,6 @@ try:
 except Exception as e:
     print("❌ Model loading failed:", e)
 
-# --- GLOBALS ---
 sentence = ""
 current_word = ""
 last_char = ""
@@ -73,7 +72,7 @@ async def websocket_endpoint(websocket: WebSocket):
             
             action = {"speak": None, "text": "", "emotion": current_emotion, "confidence": 0}
 
-            # 1. EMOTION (Threaded)
+            # 1. EMOTION
             if img_data:
                 encoded = img_data.split(",", 1)[1]
                 nparr = np.frombuffer(base64.b64decode(encoded), np.uint8)
@@ -84,26 +83,23 @@ async def websocket_endpoint(websocket: WebSocket):
             if landmarks:
                 no_hand_count = 0
                 coords = []
-                bx, by = landmarks[0]['x'], landmarks[0]['y']
+            
                 bx, by = landmarks[0][0], landmarks[0][1]
-
+            
                 for lm in landmarks:
                     coords.extend([lm[0] - bx, lm[1] - by, lm[2]])
-                
+            
                 input_data = np.array([coords], dtype=np.float32)
-
+            
                 interpreter.set_tensor(input_details[0]['index'], input_data)
                 interpreter.invoke()
-                
+            
                 p = interpreter.get_tensor(output_details[0]['index'])[0]
-                
+            
                 confidence = float(np.max(p))
                 action["confidence"] = confidence
-                input_data = np.array([coords], dtype=np.float32)
-                interpreter.set_tensor(input_details[0]['index'], input_data)
-                interpreter.invoke()
-                p = interpreter.get_tensor(output_details[0]['index'])[0]
-                
+            
+                                
                 if confidence > config["threshold"]:
                     char = labels[np.argmax(p)]
                     if char == last_char:
