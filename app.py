@@ -10,6 +10,8 @@ from fastapi import FastAPI
 
 app = FastAPI()
 
+labels = np.load("labels.npy", allow_pickle=True)
+
 @app.post("/predict")
 def predict(data: dict):
     coords = data["landmarks"]
@@ -18,16 +20,15 @@ def predict(data: dict):
 
     interpreter.set_tensor(input_details[0]['index'], input_data)
     interpreter.invoke()
-
     p = interpreter.get_tensor(output_details[0]['index'])[0]
 
-    prediction = int(np.argmax(p))
-    confidence = float(np.max(p))
+    idx = int(np.argmax(p))
 
     return {
-        "prediction": prediction,
-        "confidence": confidence
+        "label": labels[idx],
+        "confidence": float(np.max(p))
     }
+
 
 MODEL_PATH = "gesture_model_optimized.tflite"
 
