@@ -10,9 +10,19 @@ from fastapi import FastAPI
 
 app = FastAPI()
 
-@app.get("/")
-def root():
-    return {"status": "SignBridge running"}
+@app.get("/predict-test")
+def predict_test():
+    coords = np.random.rand(63).astype(np.float32)
+    input_data = np.array([coords], dtype=np.float32)
+
+    interpreter.set_tensor(input_details[0]['index'], input_data)
+    interpreter.invoke()
+    p = interpreter.get_tensor(output_details[0]['index'])[0]
+
+    return {
+        "prediction": int(np.argmax(p)),
+        "confidence": float(np.max(p))
+    }
 
 MODEL_PATH = "gesture_model_optimized.tflite"
 
@@ -97,8 +107,11 @@ async def websocket_endpoint(websocket: WebSocket):
                 p = interpreter.get_tensor(output_details[0]['index'])[0]
             
                 confidence = float(np.max(p))
-                action["confidence"] = confidence
+                prediction = int(np.argmax(p))
             
+                action["confidence"] = confidence
+                action["prediction"] = prediction
+                        
                                 
                 if confidence > config["threshold"]:
                     char = labels[np.argmax(p)]
