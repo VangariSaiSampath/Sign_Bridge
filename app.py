@@ -1,33 +1,18 @@
 import numpy as np
-import tensorflow as tf
+import tflite_runtime.interpreter as tflite
 from fastapi import FastAPI, WebSocket, HTTPException, Depends
 from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from jose import jwt
 from datetime import datetime, timedelta
-from deepface import DeepFace
-import base64
-import cv2
-import threading
 import os
 import requests
 import traceback
 
-# --- RENDER FREE TIER MEMORY SAVERS ---
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' # Disable TF debug logs
-os.environ["CUDA_VISIBLE_DEVICES"] = "-1" # Force CPU only
-
-# Force TensorFlow to only use 1 thread to save RAM
-tf.config.threading.set_inter_op_parallelism_threads(1)
-tf.config.threading.set_intra_op_parallelism_threads(1)
-# --------------------------------------
-
-
-# --- NEW: SQLAlchemy Imports ---
+# --- SQLAlchemy Imports ---
 from sqlalchemy import create_engine, Column, Integer, String, DateTime
 from sqlalchemy.orm import sessionmaker, declarative_base
-from sqlalchemy.sql import func
 
 # --- CONFIG ---
 SECRET_KEY = "signbridge_secret"
@@ -46,10 +31,7 @@ app.add_middleware(
 # ==========================================
 # DATABASE SETUP (Render PostgreSQL Ready)
 # ==========================================
-# Automatically grabs Render's DB URL. Falls back to local SQLite for testing.
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./signbridge.db")
-
-# Fix for Render: SQLAlchemy requires 'postgresql://' but Render provides 'postgres://'
 if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
@@ -60,7 +42,6 @@ engine = create_engine(
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
-# --- ORM Models ---
 class UserDB(Base):
     __tablename__ = "users"
     username = Column(String, primary_key=True, index=True)
@@ -81,10 +62,8 @@ class VocabDB(Base):
     meaning = Column(String)
     timestamp = Column(DateTime, default=datetime.utcnow)
 
-# Create tables if they don't exist
 Base.metadata.create_all(bind=engine)
 
-# Dependency to get DB session
 def get_db():
     db = SessionLocal()
     try:
@@ -93,13 +72,19 @@ def get_db():
         db.close()
 
 # ==========================================
-# AI & LOGIC GLOBALS
+# AI & LOGIC GLOBALS (TFLite Engine)
 # ==========================================
 try:
-    model = tf.keras.models.load_model("model/gesture_model.h5")
+    # Load TFLite model
+    interpreter = tflite.Interpreter(model_path="model/gesture_model.tflite")
+    interpreter.allocate_tensors()
+    
+    input_details = interpreter.get_input_details()
+    output_details = interpreter.get_output_details()
+
     DATA_DIR = "data/asl_alphabet_train/asl_alphabet_train"
     labels = sorted(os.listdir(DATA_DIR))
-    print(f"✅ Model and {len(labels)} labels loaded successfully.")
+    print(f"✅ TFLite Model and {len(labels)} labels loaded successfully.")
 except Exception as e:
     print(f"❌ Error loading model: {e}")
 
@@ -114,7 +99,7 @@ no_hand_count = 0
 
 def run_emotion_async(img, threshold):
     global current_emotion
-    # DeepFace disabled for Render Free Tier (Memory limit)
+    # DeepFace bypassed for Render Free Tier (Memory Limit constraint)
     current_emotion = "neutral"
 
 def get_meaning(word):
@@ -138,7 +123,6 @@ async def signup(data: UserAuth, db = Depends(get_db)):
     existing_user = db.query(UserDB).filter(UserDB.username == data.username).first()
     if existing_user:
         raise HTTPException(status_code=400, detail="Username already exists")
-    
     new_user = UserDB(username=data.username, password=data.password)
     db.add(new_user)
     db.commit()
@@ -159,11 +143,7 @@ async def get_history(db = Depends(get_db)):
 
 @app.post("/api/vocab")
 async def add_vocab(item: dict, db = Depends(get_db)):
-    new_vocab = VocabDB(
-        username=item.get('username'), 
-        word=item.get('word'), 
-        meaning=item.get('meaning')
-    )
+    new_vocab = VocabDB(username=item.get('username'), word=item.get('word'), meaning=item.get('meaning'))
     db.add(new_vocab)
     db.commit()
     return {"status": "success"}
@@ -186,7 +166,7 @@ async def get():
     with open("index.html", "r") as f: return HTMLResponse(content=f.read())
 
 # ==========================================
-# WEBSOCKET ENGINE
+# WEBSOCKET ENGINE (TFLite Inference)
 # ==========================================
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
@@ -209,7 +189,6 @@ async def websocket_endpoint(websocket: WebSocket):
             cmd = data.get("command")
             if cmd == "clear":
                 if sentence.strip():
-                    # Open a fresh DB session for the websocket thread
                     db = SessionLocal()
                     new_hist = HistoryDB(username=username, sentence=sentence.strip())
                     db.add(new_hist)
@@ -222,7 +201,6 @@ async def websocket_endpoint(websocket: WebSocket):
                 continue
 
             landmarks = data.get("landmarks")
-            img_data = data.get("image")
             config = data.get("config", {"threshold": 0.85, "buffer": 5, "emo_threshold": 0.5})
             
             action = {
@@ -232,12 +210,6 @@ async def websocket_endpoint(websocket: WebSocket):
                 "current_letter": "-" 
             }
 
-            if img_data:
-                encoded = img_data.split(",", 1)[1]
-                nparr = np.frombuffer(base64.b64decode(encoded), np.uint8)
-                img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-                threading.Thread(target=run_emotion_async, args=(img, config["emo_threshold"]), daemon=True).start()
-
             if landmarks:
                 no_hand_count = 0
                 coords = []
@@ -245,7 +217,13 @@ async def websocket_endpoint(websocket: WebSocket):
                 for lm in landmarks:
                     coords.extend([lm['x'] - bx, lm['y'] - by, lm['z']])
                 
-                p = model(np.array([coords]), training=False).numpy()
+                # --- NEW TFLITE PREDICTION LOGIC ---
+                input_data = np.array([coords], dtype=np.float32)
+                interpreter.set_tensor(input_details[0]['index'], input_data)
+                interpreter.invoke()
+                
+                output_data = interpreter.get_tensor(output_details[0]['index'])
+                p = output_data[0]
                 confidence = float(np.max(p))
                 action["confidence"] = confidence
                 
