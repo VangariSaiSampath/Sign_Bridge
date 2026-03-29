@@ -74,11 +74,19 @@ def get_db():
 # ==========================================
 # AI & LOGIC GLOBALS (TFLite Engine)
 # ==========================================
-# Define globals but don't load them yet
 interpreter = None
 input_details = None
 output_details = None
 labels = []
+
+sentence = ""
+current_word = ""
+last_char = ""
+last_completed_word = "" 
+last_meaning = ""
+counter = 0
+current_emotion = "neutral"
+no_hand_count = 0
 
 def get_model():
     global interpreter, input_details, output_details, labels
@@ -92,27 +100,6 @@ def get_model():
             print("✅ Model loaded successfully")
         except Exception as e:
             print(f"❌ Model load error: {e}")
-    return interpreter, labels
-
-@app.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket):
-    global sentence, current_word, last_char, counter, current_emotion, no_hand_count, last_completed_word, last_meaning
-    
-    get_model()
-
-sentence = ""
-current_word = ""
-last_char = ""
-last_completed_word = "" 
-last_meaning = ""
-counter = 0
-current_emotion = "neutral"
-no_hand_count = 0
-
-def run_emotion_async(img, threshold):
-    global current_emotion
-    # DeepFace bypassed for Render Free Tier (Memory Limit constraint)
-    current_emotion = "neutral"
 
 def get_meaning(word):
     if not word: return ""
@@ -165,16 +152,9 @@ async def get_vocab(db = Depends(get_db)):
     vocab = db.query(VocabDB).order_by(VocabDB.timestamp.desc()).all()
     return [{"id": r.id, "word": r.word, "meaning": r.meaning, "time": r.timestamp.strftime("%Y-%m-%d %H:%M:%S")} for r in vocab]
 
-@app.delete("/api/vocab/{vocab_id}")
-async def delete_vocab(vocab_id: int, db = Depends(get_db)):
-    item = db.query(VocabDB).filter(VocabDB.id == vocab_id).first()
-    if item:
-        db.delete(item)
-        db.commit()
-    return {"status": "success"}
-
 @app.get("/")
 async def get():
+    # Make sure your HTML file is actually named index.html in your folder!
     with open("index.html", "r") as f: return HTMLResponse(content=f.read())
 
 # ==========================================
@@ -193,6 +173,9 @@ async def websocket_endpoint(websocket: WebSocket):
         return
 
     await websocket.accept()
+    
+    # Load model lazily right after accepting the connection
+    get_model()
     
     try:
         while True:
@@ -222,14 +205,14 @@ async def websocket_endpoint(websocket: WebSocket):
                 "current_letter": "-" 
             }
 
-            if landmarks:
+            if landmarks and interpreter is not None:
                 no_hand_count = 0
                 coords = []
                 bx, by = landmarks[0]['x'], landmarks[0]['y']
                 for lm in landmarks:
                     coords.extend([lm['x'] - bx, lm['y'] - by, lm['z']])
                 
-                # --- NEW TFLITE PREDICTION LOGIC ---
+                # Inference
                 input_data = np.array([coords], dtype=np.float32)
                 interpreter.set_tensor(input_details[0]['index'], input_data)
                 interpreter.invoke()
