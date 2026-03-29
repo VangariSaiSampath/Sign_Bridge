@@ -89,7 +89,7 @@ counter = 0
 no_hand_count = 0
 
 def load_model_globally():
-    """Initializes the TFLite interpreter and loads labels."""
+    """Ensures the TFLite model is loaded into memory correctly."""
     global interpreter, input_details, output_details, labels
     if interpreter is None:
         try:
@@ -97,7 +97,7 @@ def load_model_globally():
             labels_path = "labels.npy"
             
             if not os.path.exists(model_path) or not os.path.exists(labels_path):
-                print(f"❌ Critical Error: {model_path} or {labels_path} missing!")
+                print(f"❌ Missing files: {model_path} or {labels_path}")
                 return
 
             interpreter = tflite.Interpreter(model_path=model_path)
@@ -105,10 +105,9 @@ def load_model_globally():
             input_details = interpreter.get_input_details()
             output_details = interpreter.get_output_details()
             labels = np.load(labels_path, allow_pickle=True).tolist()
-            print(f"✅ TFLite Engine Loaded: {len(labels)} labels ready.")
+            print("✅ TFLite Engine Initialized")
         except Exception as e:
             print(f"❌ Model load error: {e}")
-            traceback.print_exc()
 
 @app.on_event("startup")
 async def startup_event():
@@ -184,7 +183,6 @@ async def get():
 async def websocket_endpoint(websocket: WebSocket):
     global sentence, current_word, last_char, counter, no_hand_count, last_completed_word, last_meaning
     
-    # Ensure model is initialized
     load_model_globally()
     
     token = websocket.query_params.get("token")
@@ -201,7 +199,6 @@ async def websocket_endpoint(websocket: WebSocket):
         while True:
             data = await websocket.receive_json()
             
-            # Command Handling
             cmd = data.get("command")
             if cmd == "clear":
                 if sentence.strip():
@@ -229,12 +226,11 @@ async def websocket_endpoint(websocket: WebSocket):
             if landmarks and interpreter:
                 no_hand_count = 0
                 coords = []
-                # index.html sends landmarks as [ [x,y,z], [x,y,z]... ]
+                # Match the [ [x,y,z], ... ] format from index.html
                 bx, by = landmarks[0][0], landmarks[0][1]
                 for lm in landmarks:
                     coords.extend([lm[0] - bx, lm[1] - by, lm[2]])
                 
-                # TFLite Inference
                 input_data = np.array([coords], dtype=np.float32)
                 interpreter.set_tensor(input_details[0]['index'], input_data)
                 interpreter.invoke()
@@ -251,24 +247,25 @@ async def websocket_endpoint(websocket: WebSocket):
                     if char == last_char:
                         counter += 1
                     else:
-                        last_char = char; counter = 0
+                        last_char = char
+                        counter = 0
                     
+                    # 🔥 FIX: Reset counter to 0 after confirming a character
                     if counter >= config["buffer"]:
                         if char not in ['nothing', 'space', 'del']:
                             current_word += char
                             action["current_word"] = current_word
                             action["speak"] = char 
-                            counter = 0 # Reset after registering
+                            counter = 0 
                             
                         elif char == 'space' and current_word != "":
                             last_completed_word = current_word
                             last_meaning = get_meaning(last_completed_word)
-                            action["speak"] = last_completed_word if last_meaning != "No word exists" else "Word not found"
+                            action["speak"] = last_completed_word if last_meaning != "No word exists" else "No word exists"
                             sentence += current_word + " "
                             current_word = ""
                             counter = 0
             else:
-                # No hands detected logic
                 no_hand_count += 1
                 if no_hand_count > 15 and current_word != "":
                     last_completed_word = current_word
