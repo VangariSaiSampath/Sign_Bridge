@@ -76,7 +76,7 @@ def get_db():
 # ==========================================
 try:
     # Load TFLite model
-    interpreter = tflite.Interpreter(model_path="model/gesture_model.tflite")
+    interpreter = tflite.Interpreter(model_path="gesture_model_optimized.tflite")
     interpreter.allocate_tensors()
     
     input_details = interpreter.get_input_details()
