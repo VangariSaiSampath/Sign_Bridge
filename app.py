@@ -82,8 +82,7 @@ try:
     input_details = interpreter.get_input_details()
     output_details = interpreter.get_output_details()
 
-    DATA_DIR = "data/asl_alphabet_train/asl_alphabet_train"
-    labels = sorted(os.listdir(DATA_DIR))
+    labels = np.load("labels.npy", allow_pickle=True).tolist()
     print(f"✅ TFLite Model and {len(labels)} labels loaded successfully.")
 except Exception as e:
     print(f"❌ Error loading model: {e}")
