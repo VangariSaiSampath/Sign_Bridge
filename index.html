@@ -64,15 +64,8 @@
     .tab-btn { flex: 1; padding: 10px; border-radius: 8px; border: none; cursor: pointer; background: #1e293b; color: #94a3b8; font-weight: bold; transition: 0.3s; }
     .tab-btn.active { background: #2563eb; color: white; }
 
-    #settings-panel { transition: max-height 0.3s ease-out; overflow: hidden; }
-    
     .live-badge { background: #020617; border: 1px solid rgba(96,165,250,0.3); border-radius: 12px; padding: 10px 20px; text-align: center; min-width: 80px;}
     .live-badge h1 { color: #22c55e; font-size: 42px; line-height: 1; margin: 0; text-transform: uppercase;}
-
-    @media (max-width: 768px) {
-        .auth-container { grid-template-columns: 1fr !important; }
-        .grid-2 { grid-template-columns: 1fr !important; }
-    }
   </style>
 </head>
 <body>
@@ -83,7 +76,7 @@
       <div class="card" style="background: linear-gradient(135deg, rgba(37,99,235,0.2), rgba(15,23,42,1)); padding: 40px; display: flex; flex-direction: column; justify-content: center;">
         <div class="logo" style="font-size: 32px; margin-bottom: 15px;">SignBridge AI</div>
         <h1 style="margin-bottom: 15px; line-height: 1.2;">Cross-Platform ASL Translation</h1>
-        <p style="line-height: 1.7; color:#94a3b8;">Login to access real-time gesture recognition powered by MediaPipe and FastAPI.</p>
+        <p style="color:#94a3b8;">Real-time gesture recognition powered by MediaPipe.</p>
       </div>
 
       <div class="card" style="padding: 30px;">
@@ -91,12 +84,9 @@
           <button id="tabLogin" class="tab-btn active" onclick="switchAuth('login')">Login</button>
           <button id="tabSignup" class="tab-btn" onclick="switchAuth('signup')">Sign Up</button>
         </div>
-
         <div id="loginFields">
-          <h2 style="margin-bottom: 20px; font-size: 24px;">Welcome Back</h2>
           <div class="form-group">
-            <label>Username</label>
-            <input type="text" id="logU" placeholder="Enter username" />
+            <label>Username</label><input type="text" id="logU" placeholder="Enter username" />
             <label style="margin-top:10px;">Password</label>
             <div class="pwd-wrapper">
               <input type="password" id="logP" placeholder="Enter password" />
@@ -105,12 +95,9 @@
           </div>
           <button class="btn" style="width:100%" onclick="handleAuth('login')">Login to Dashboard</button>
         </div>
-
         <div id="signupFields" class="hidden">
-          <h2 style="margin-bottom: 20px; font-size: 24px;">Create Account</h2>
           <div class="form-group">
-            <label>New Username</label>
-            <input type="text" id="sigU" placeholder="Choose username" />
+            <label>New Username</label><input type="text" id="sigU" placeholder="Choose username" />
             <label style="margin-top:10px;">New Password</label>
             <div class="pwd-wrapper">
               <input type="password" id="sigP" placeholder="Choose password" />
@@ -128,26 +115,21 @@
       <aside class="sidebar">
         <div class="logo">SignBridge</div>
         <div class="subtitle" id="welcomeUser">Menu</div>
-        
         <button id="nav-dashboard" class="nav-btn active" onclick="switchPage('dashboard')">Dashboard</button>
         <button id="nav-history" class="nav-btn" onclick="switchPage('history')">History</button>
-        <button id="nav-vocab" class="nav-btn" onclick="switchPage('vocab')">Vocabulary Settings</button>
+        <button id="nav-vocab" class="nav-btn" onclick="switchPage('vocab')">Vocabulary</button>
         
-        <button class="nav-btn" onclick="toggleSettings()" style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px;">
-          <span>⚙️ AI Tuning</span> <span id="settings-icon">▼</span>
-        </button>
-        
-        <div id="settings-panel" class="hidden" style="background: rgba(0,0,0,0.2); padding: 15px; border-radius: 12px; margin-bottom: 10px; border: 1px solid rgba(255,255,255,0.05);">
-          <div class="form-group" style="margin-bottom: 15px;">
-            <label style="font-size: 13px; color: #cbd5e1;">Sign Strictness: <span id="acc_val" style="color:#60a5fa">85</span>%</label>
+        <div style="background: rgba(0,0,0,0.2); padding: 15px; border-radius: 12px; margin-top: 20px;">
+          <p style="font-size: 12px; color: #94a3b8; margin-bottom: 10px;">⚙️ AI TUNING</p>
+          <div class="form-group">
+            <label>Strictness: <span id="acc_val">85</span>%</label>
             <input type="range" id="acc_slider" min="70" max="98" value="85">
           </div>
-          <div class="form-group" style="margin-bottom: 0;">
-            <label style="font-size: 13px; color: #cbd5e1;">Predicting Speed: <span id="speed_val" style="color:#60a5fa">5</span> f</label>
+          <div class="form-group">
+            <label>Speed: <span id="speed_val">5</span> f</label>
             <input type="range" id="speed_slider" min="2" max="25" value="5">
           </div>
         </div>
-
         <button class="nav-btn btn-danger" onclick="logoutUser()" style="margin-top: auto;">Logout</button>
       </aside>
 
@@ -159,64 +141,38 @@
 
         <div id="page-dashboard">
           <div class="grid grid-2">
-            <div>
-              <div class="card">
-                <h2 class="section-title" style="margin-bottom:15px;">Camera Feed</h2>
-                <div class="preview-box">
-                  <video id="input_video" autoplay playsinline></video>
-                  <canvas id="output_canvas"></canvas>
-                </div>
-                <button class="btn" style="width: 100%; margin-top: 15px;" id="camBtn" onclick="startWebcam()">Start AI Webcam</button>
+            <div class="card">
+              <div class="preview-box">
+                <video id="input_video" autoplay playsinline></video>
+                <canvas id="output_canvas"></canvas>
               </div>
+              <button class="btn" style="width: 100%; margin-top: 15px;" id="camBtn" onclick="startWebcam()">Start AI Webcam</button>
             </div>
-              
-            <div>
-              <div class="card result-box">
-                <div style="display:flex; justify-content:space-between; align-items: flex-start;">
-                  <div>
-                    <p style="color:#94a3b8;">Predicted Word</p>
-                    <h2 id="predictedWord">...</h2>
-                  </div>
-                  <div class="live-badge">
-                    <p style="color:#94a3b8; font-size:11px; margin-bottom:3px; font-weight:bold;">LIVE SIGN</p>
-                    <h1 id="liveLetter">-</h1>
-                  </div>
-                </div>
-                <p id="liveTyping" style="color:#94a3b8; font-size:16px; margin-top:15px;">Typing: </p>
-                <p id="wordMeaning" style="color: #f59e0b; margin-top: 10px; font-style: italic; min-height: 40px;">Meaning will appear here</p>
-                <button class="btn btn-outline" style="margin-top:10px; font-size:12px; padding: 8px 12px;" onclick="saveCurrentWordToVocab()">⭐ Save to Vocabulary</button>
+            <div class="card result-box">
+              <div style="display:flex; justify-content:space-between;">
+                <div><p>Predicted Word</p><h2 id="predictedWord">...</h2></div>
+                <div class="live-badge"><p style="font-size:10px;">LIVE</p><h1 id="liveLetter">-</h1></div>
               </div>
+              <p id="liveTyping" style="margin-top:15px; color:#94a3b8;">Typing: </p>
+              <p id="wordMeaning" style="color:#f59e0b; font-style:italic; margin-top:10px;">Meaning...</p>
+              <button class="btn btn-outline" style="margin-top:10px; font-size:12px;" onclick="saveCurrentWordToVocab()">⭐ Save</button>
               
-              <div class="card" style="background:#0b1220;">
-                <p style="color:#94a3b8;">Full Sentence</p>
-                <p id="translatedText" style="font-size:24px; margin-top:8px; font-weight:bold; min-height:35px;">Waiting...</p>
+              <div class="card" style="background:#0b1220; margin-top:20px;">
+                <p id="translatedText" style="font-size:24px; font-weight:bold;">Waiting...</p>
               </div>
-              
-              <div style="display:flex; gap:10px; margin-bottom: 20px;">
-                <button class="btn btn-warning" style="flex:1" onclick="sendCommand('backspace')">Backspace</button>
+              <div style="display:flex; gap:10px;">
+                <button class="btn btn-warning" style="flex:1" onclick="sendCommand('backspace')">Delete</button>
                 <button class="btn btn-danger" style="flex:1" onclick="sendCommand('clear')">Clear & Save</button>
-              </div>
-
-              <div class="card" style="background:#0b1220; padding:15px;">
-                <p style="color:#94a3b8;">AI Confidence</p>
-                <p id="confidenceScore" style="font-size:22px; margin-top:5px; color:#22c55e;">0.0%</p>
               </div>
             </div>
           </div>
         </div>
 
         <div id="page-history" class="hidden card">
-          <table id="historyTable">
-            <thead><tr><th>Time</th><th>Translated Sentence</th></tr></thead>
-            <tbody id="historyTableBody"></tbody>
-          </table>
+          <table><thead><tr><th>Time</th><th>Sentence</th></tr></thead><tbody id="historyTableBody"></tbody></table>
         </div>
-
         <div id="page-vocab" class="hidden card">
-          <table id="vocabTable">
-            <thead><tr><th>Word</th><th>Meaning</th><th>Action</th></tr></thead>
-            <tbody id="vocabTableBody"></tbody>
-          </table>
+          <table><thead><tr><th>Word</th><th>Meaning</th><th>Action</th></tr></thead><tbody id="vocabTableBody"></tbody></table>
         </div>
       </main>
     </div>
@@ -226,7 +182,7 @@
     let ws = null;
     let cameraInstance = null;
     let lastProcessedTime = 0;
-    const FRAME_RATE_LIMIT = 120; // 🔥 120ms = ~8 FPS (Safe for Render Free Tier)
+    const FRAME_RATE_LIMIT = 150; // 🔥 Throttled to ~7 FPS for server stability
 
     const videoElement = document.getElementById('input_video');
     const canvasElement = document.getElementById('output_canvas');
@@ -237,174 +193,114 @@
     accSlider.oninput = () => document.getElementById('acc_val').innerText = accSlider.value;
     speedSlider.oninput = () => document.getElementById('speed_val').innerText = speedSlider.value;
 
-    function showToast(msg, type = 'success') {
-      const toast = document.getElementById('toast');
-      toast.textContent = msg;
-      toast.className = `toast ${type}`;
-      toast.classList.remove('hidden');
-      setTimeout(() => toast.classList.add('hidden'), 3000);
+    function showToast(msg, type='success') {
+      const t = document.getElementById('toast');
+      t.innerText = msg; t.className = `toast ${type}`; t.classList.remove('hidden');
+      setTimeout(() => t.classList.add('hidden'), 3000);
     }
 
-    function togglePassword(inputId, btn) {
-      const input = document.getElementById(inputId);
-      input.type = input.type === 'password' ? 'text' : 'password';
-      btn.innerText = input.type === 'password' ? '👁️' : '🙈';
+    function togglePassword(id, btn) {
+      const i = document.getElementById(id); i.type = i.type==='password'?'text':'password';
+      btn.innerText = i.type==='password'?'👁️':'🙈';
     }
 
-    function switchAuth(type) {
-      document.getElementById('loginFields').classList.toggle('hidden', type !== 'login');
-      document.getElementById('signupFields').classList.toggle('hidden', type !== 'signup');
-      document.getElementById('tabLogin').classList.toggle('active', type === 'login');
-      document.getElementById('tabSignup').classList.toggle('active', type === 'signup');
+    function switchAuth(t) {
+      document.getElementById('loginFields').classList.toggle('hidden', t!=='login');
+      document.getElementById('signupFields').classList.toggle('hidden', t!=='signup');
+      document.getElementById('tabLogin').classList.toggle('active', t==='login');
+      document.getElementById('tabSignup').classList.toggle('active', t==='signup');
     }
 
-    async function handleAuth(type) {
-      const uId = type === 'login' ? 'logU' : 'sigU';
-      const pId = type === 'login' ? 'logP' : 'sigP';
-      const username = document.getElementById(uId).value.trim();
-      const password = document.getElementById(pId).value.trim();
-      if (!username || !password) return showToast("Fields required", "error");
-
-      try {
-        const res = await fetch(`/${type}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username, password })
-        });
-        const data = await res.json();
-        if (res.ok) {
-          if (type === 'login') {
-            sessionStorage.setItem('jwt_token', data.access_token);
-            sessionStorage.setItem('username', username);
-            document.getElementById('authPage').classList.add('hidden');
-            document.getElementById('dashboardPage').classList.remove('hidden');
-            document.getElementById('welcomeUser').innerText = `Welcome, ${username}`;
-            showToast("Logged In");
-          } else {
-            showToast("Account Created");
-            switchAuth('login');
-          }
-        } else showToast(data.detail, "error");
-      } catch (e) { showToast("Connection Error", "error"); }
+    async function handleAuth(t) {
+      const u = document.getElementById(t==='login'?'logU':'sigU').value;
+      const p = document.getElementById(t==='login'?'logP':'sigP').value;
+      const res = await fetch(`/${t}`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({username:u, password:p}) });
+      const data = await res.json();
+      if(res.ok) {
+        if(t==='login') {
+          sessionStorage.setItem('jwt_token', data.access_token);
+          sessionStorage.setItem('username', u);
+          document.getElementById('authPage').classList.add('hidden');
+          document.getElementById('dashboardPage').classList.remove('hidden');
+          document.getElementById('welcomeUser').innerText = `User: ${u}`;
+          showToast("Welcome!");
+        } else { showToast("Created! Log in now"); switchAuth('login'); }
+      } else showToast(data.detail, "error");
     }
 
-    function logoutUser() {
-      sessionStorage.clear();
-      location.reload();
-    }
+    function logoutUser() { sessionStorage.clear(); location.reload(); }
 
     function switchPage(p) {
       ['dashboard', 'history', 'vocab'].forEach(id => {
-        document.getElementById(`page-${id}`).classList.toggle('hidden', id !== p);
-        document.getElementById(`nav-${id}`).classList.toggle('active', id === p);
+        document.getElementById(`page-${id}`).classList.toggle('hidden', id!==p);
+        document.getElementById(`nav-${id}`).classList.toggle('active', id===p);
       });
-      if (p === 'history') loadHistory();
-      if (p === 'vocab') loadVocab();
-    }
-
-    function toggleSettings() {
-      const p = document.getElementById('settings-panel');
-      p.classList.toggle('hidden');
-      document.getElementById('settings-icon').innerText = p.classList.contains('hidden') ? '▼' : '▲';
+      if(p==='history') loadHistory(); if(p==='vocab') loadVocab();
     }
 
     async function loadHistory() {
-      const res = await fetch('/api/history');
-      const data = await res.json();
-      document.getElementById('historyTableBody').innerHTML = data.map(r => `<tr><td>${r.time}</td><td>${r.sentence}</td></tr>`).join('');
+      const res = await fetch('/api/history'); const d = await res.json();
+      document.getElementById('historyTableBody').innerHTML = d.map(r=>`<tr><td>${r.time}</td><td>${r.sentence}</td></tr>`).join('');
     }
 
     async function loadVocab() {
-      const res = await fetch('/api/vocab');
-      const data = await res.json();
-      document.getElementById('vocabTableBody').innerHTML = data.map(r => `<tr><td>${r.word}</td><td>${r.meaning}</td><td><button class="btn btn-danger" onclick="deleteVocab(${r.id})">Del</button></td></tr>`).join('');
+      const res = await fetch('/api/vocab'); const d = await res.json();
+      document.getElementById('vocabTableBody').innerHTML = d.map(r=>`<tr><td>${r.word}</td><td>${r.meaning}</td><td><button class="btn btn-danger" onclick="deleteVocab(${r.id})">X</button></td></tr>`).join('');
     }
 
     async function saveCurrentWordToVocab() {
       const word = document.getElementById('predictedWord').innerText;
-      const meaning = document.getElementById('wordMeaning').innerText;
-      if (word === "...") return showToast("No word detected", "error");
-      await fetch('/api/vocab', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: sessionStorage.getItem('username'), word, meaning })
-      });
+      if(word==="...") return;
+      await fetch('/api/vocab', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({username:sessionStorage.getItem('username'), word, meaning:document.getElementById('wordMeaning').innerText}) });
       showToast("Saved!");
     }
 
-    async function deleteVocab(id) {
-      await fetch(`/api/vocab/${id}`, { method: 'DELETE' });
-      loadVocab();
-    }
+    async function deleteVocab(id) { await fetch(`/api/vocab/${id}`, {method:'DELETE'}); loadVocab(); }
 
     function connectServer() {
       const token = sessionStorage.getItem('jwt_token');
       const prot = location.protocol === 'https:' ? 'wss://' : 'ws://';
       ws = new WebSocket(`${prot}${location.host}/ws?token=${token}`);
-      
-      ws.onopen = () => {
-        document.getElementById('conn_status').innerText = "Online";
-        document.getElementById('conn_status').style.background = "#22c55e";
-      };
-
-      ws.onclose = () => {
-        document.getElementById('conn_status').innerText = "Offline";
-        document.getElementById('conn_status').style.background = "#ef4444";
-        setTimeout(connectServer, 3000);
-      };
-
+      ws.onopen = () => { document.getElementById('conn_status').innerText = "Online"; document.getElementById('conn_status').style.background = "#22c55e"; };
+      ws.onclose = () => { document.getElementById('conn_status').innerText = "Offline"; document.getElementById('conn_status').style.background = "#ef4444"; setTimeout(connectServer, 3000); };
       ws.onmessage = (e) => {
         const d = JSON.parse(e.data);
         document.getElementById('translatedText').innerText = d.text || "Waiting...";
         document.getElementById('liveTyping').innerText = "Typing: " + (d.current_word || "");
-        document.getElementById('confidenceScore').innerText = ((d.confidence || 0) * 100).toFixed(1) + "%";
-        document.getElementById('liveLetter').innerText = (d.current_letter && d.current_letter !== 'nothing') ? d.current_letter.toUpperCase() : '-';
-        if (d.completed_word) {
-            document.getElementById('predictedWord').innerText = d.completed_word;
-            document.getElementById('wordMeaning').innerText = d.meaning;
+        document.getElementById('liveLetter').innerText = (d.current_letter && d.current_letter!=='nothing') ? d.current_letter.toUpperCase() : '-';
+        if(d.completed_word) {
+          document.getElementById('predictedWord').innerText = d.completed_word;
+          document.getElementById('wordMeaning').innerText = d.meaning;
         }
-        if (d.speak && 'speechSynthesis' in window) {
-            window.speechSynthesis.cancel();
-            window.speechSynthesis.speak(new SpeechSynthesisUtterance(d.speak));
+        if(d.speak && 'speechSynthesis' in window) {
+          window.speechSynthesis.cancel();
+          window.speechSynthesis.speak(new SpeechSynthesisUtterance(d.speak));
         }
       };
     }
 
     const hands = new Hands({ locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}` });
-    hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.6, minTrackingConfidence: 0.6 });
-    
+    hands.setOptions({ maxNumHands:1, modelComplexity:1, minDetectionConfidence:0.6 });
     hands.onResults((res) => {
       canvasCtx.save();
-      canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
-      canvasCtx.drawImage(res.image, 0, 0, canvasElement.width, canvasElement.height);
-
+      canvasCtx.clearRect(0,0,640,480);
+      canvasCtx.drawImage(res.image, 0,0,640,480);
       const now = Date.now();
-      if (now - lastProcessedTime > FRAME_RATE_LIMIT) {
+      if(now - lastProcessedTime > FRAME_RATE_LIMIT && res.multiHandLandmarks && res.multiHandLandmarks[0]) {
         lastProcessedTime = now;
-        if (res.multiHandLandmarks && res.multiHandLandmarks.length > 0) {
-          const lm = res.multiHandLandmarks[0];
-          drawConnectors(canvasCtx, lm, HAND_CONNECTIONS, { color: '#00FF00', lineWidth: 4 });
-          if (ws && ws.readyState === 1) {
-            ws.send(JSON.stringify({ 
-                landmarks: lm.map(p => [p.x, p.y, p.z]),
-                config: { threshold: parseFloat(accSlider.value)/100, buffer: parseInt(speedSlider.value) }
-            }));
-          }
-        }
+        const lm = res.multiHandLandmarks[0];
+        drawConnectors(canvasCtx, lm, HAND_CONNECTIONS, {color:'#00FF00', lineWidth:4});
+        if(ws && ws.readyState===1) ws.send(JSON.stringify({ landmarks: lm.map(p=>[p.x, p.y, p.z]), config: {threshold: parseFloat(accSlider.value)/100, buffer: parseInt(speedSlider.value)} }));
       }
       canvasCtx.restore();
     });
 
     function startWebcam() {
-      cameraInstance = new Camera(videoElement, { onFrame: async () => { await hands.send({ image: videoElement }); }, width: 640, height: 480 });
-      cameraInstance.start().then(() => {
-        document.getElementById('camBtn').innerText = "Webcam Running ✔️";
-        document.getElementById('camBtn').style.background = "#22c55e";
-        connectServer();
-      });
+      cameraInstance = new Camera(videoElement, { onFrame: async () => { await hands.send({image:videoElement}); }, width:640, height:480 });
+      cameraInstance.start().then(() => { connectServer(); document.getElementById('camBtn').innerText="AI Running ✔️"; });
     }
 
-    function sendCommand(cmd) { if (ws && ws.readyState === 1) ws.send(JSON.stringify({ command: cmd })); }
+    function sendCommand(cmd) { if(ws && ws.readyState===1) ws.send(JSON.stringify({command:cmd})); }
   </script>
 </body>
 </html>
