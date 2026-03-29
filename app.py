@@ -74,19 +74,29 @@ def get_db():
 # ==========================================
 # AI & LOGIC GLOBALS (TFLite Engine)
 # ==========================================
-try:
-    # Load TFLite model
-    interpreter = tflite.Interpreter(model_path="gesture_model_optimized.tflite")
-    interpreter.allocate_tensors()
-    
-    input_details = interpreter.get_input_details()
-    output_details = interpreter.get_output_details()
+# Define globals but don't load them yet
+interpreter = None
+input_details = None
+output_details = None
+labels = []
 
-    labels = np.load("labels.npy", allow_pickle=True).tolist()
-    print(f"✅ TFLite Model and {len(labels)} labels loaded successfully.")
-except Exception as e:
-    print(f"❌ Error loading model: {e}")
+def load_model():
+    global interpreter, input_details, output_details, labels
+    if interpreter is None:
+        try:
+            interpreter = tflite.Interpreter(model_path="gesture_model_optimized.tflite")
+            interpreter.allocate_tensors()
+            input_details = interpreter.get_input_details()
+            output_details = interpreter.get_output_details()
+            labels = np.load("labels.npy", allow_pickle=True).tolist()
+            print("✅ Model loaded lazily.")
+        except Exception as e:
+            print(f"❌ Model load failed: {e}")
 
+# In your WebSocket endpoint, call load_model() at the start
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    load_model() 
 sentence = ""
 current_word = ""
 last_char = ""
