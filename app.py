@@ -177,13 +177,14 @@ async def get():
     with open("index.html", "r") as f: return HTMLResponse(content=f.read())
 
 # ==========================================
-# WEBSOCKET ENGINE
+# WEBSOCKET ENGINE (TFLite Inference)
 # ==========================================
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     global sentence, current_word, last_char, counter, no_hand_count, last_completed_word, last_meaning
     
     load_model_globally()
+    
     token = websocket.query_params.get("token")
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
@@ -216,7 +217,7 @@ async def websocket_endpoint(websocket: WebSocket):
             config = data.get("config", {"threshold": 0.85, "buffer": 5})
             
             action = {
-                "speak": None, "text": f"{sentence} {current_word}".strip(),
+                "speak": None, "text": f"{sentence} {current_word}",
                 "confidence": 0.0, "meaning": last_meaning, 
                 "completed_word": last_completed_word, "current_word": current_word,
                 "current_letter": "-" 
@@ -225,6 +226,7 @@ async def websocket_endpoint(websocket: WebSocket):
             if landmarks and interpreter:
                 no_hand_count = 0
                 coords = []
+                # Match the [ [x,y,z], ... ] format from index.html
                 bx, by = landmarks[0][0], landmarks[0][1]
                 for lm in landmarks:
                     coords.extend([lm[0] - bx, lm[1] - by, lm[2]])
@@ -248,7 +250,7 @@ async def websocket_endpoint(websocket: WebSocket):
                         last_char = char
                         counter = 0
                     
-                    # FIXED: Reset counter to 0 immediately after confirming letter
+                    # 🔥 FIX: Reset counter to 0 after confirming a character
                     if counter >= config["buffer"]:
                         if char not in ['nothing', 'space', 'del']:
                             current_word += char
@@ -259,7 +261,7 @@ async def websocket_endpoint(websocket: WebSocket):
                         elif char == 'space' and current_word != "":
                             last_completed_word = current_word
                             last_meaning = get_meaning(last_completed_word)
-                            action["speak"] = last_completed_word
+                            action["speak"] = last_completed_word if last_meaning != "No word exists" else "No word exists"
                             sentence += current_word + " "
                             current_word = ""
                             counter = 0
@@ -275,7 +277,10 @@ async def websocket_endpoint(websocket: WebSocket):
                     no_hand_count = 0
 
             action["text"] = f"{sentence} {current_word}".strip()
+            action["completed_word"] = last_completed_word
+            action["meaning"] = last_meaning
             await websocket.send_json(action)
 
     except Exception as e:
         print(f"❌ WebSocket error: {e}")
+        traceback.print_exc()
