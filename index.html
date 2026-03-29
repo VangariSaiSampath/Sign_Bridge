@@ -24,7 +24,6 @@
     
     .main { flex: 1; padding: 24px; max-width: 100%; }
     .topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
-    .title h1 { font-size: 28px; }
     
     .btn { background: #2563eb; color: white; border: none; padding: 12px 18px; border-radius: 12px; cursor: pointer; font-weight: bold; transition: 0.3s;}
     .btn:hover { background: #1d4ed8; }
@@ -67,11 +66,9 @@
 
     #settings-panel { transition: max-height 0.3s ease-out; overflow: hidden; }
     
-    /* Live Letter Badge */
     .live-badge { background: #020617; border: 1px solid rgba(96,165,250,0.3); border-radius: 12px; padding: 10px 20px; text-align: center; min-width: 80px;}
     .live-badge h1 { color: #22c55e; font-size: 42px; line-height: 1; margin: 0; text-transform: uppercase;}
 
-    /* Auth Layout */
     @media (max-width: 768px) {
         .auth-container { grid-template-columns: 1fr !important; }
         .grid-2 { grid-template-columns: 1fr !important; }
@@ -83,7 +80,6 @@
 
   <section id="authPage" class="auth-wrapper" style="min-height: 100vh; display: flex; align-items: center; justify-content: center;">
     <div class="auth-container" style="max-width: 900px; display: grid; grid-template-columns: 1fr 1fr; gap: 24px; width: 100%; padding: 20px;">
-      
       <div class="card" style="background: linear-gradient(135deg, rgba(37,99,235,0.2), rgba(15,23,42,1)); padding: 40px; display: flex; flex-direction: column; justify-content: center;">
         <div class="logo" style="font-size: 32px; margin-bottom: 15px;">SignBridge AI</div>
         <h1 style="margin-bottom: 15px; line-height: 1.2;">Cross-Platform ASL Translation</h1>
@@ -100,8 +96,8 @@
           <h2 style="margin-bottom: 20px; font-size: 24px;">Welcome Back</h2>
           <div class="form-group">
             <label>Username</label>
-            <input type="text" id="logU" placeholder="Enter username" style="margin-bottom: 10px;" />
-            <label>Password</label>
+            <input type="text" id="logU" placeholder="Enter username" />
+            <label style="margin-top:10px;">Password</label>
             <div class="pwd-wrapper">
               <input type="password" id="logP" placeholder="Enter password" />
               <button class="pwd-toggle" onclick="togglePassword('logP', this)">👁️</button>
@@ -114,8 +110,8 @@
           <h2 style="margin-bottom: 20px; font-size: 24px;">Create Account</h2>
           <div class="form-group">
             <label>New Username</label>
-            <input type="text" id="sigU" placeholder="Choose username" style="margin-bottom: 10px;" />
-            <label>New Password</label>
+            <input type="text" id="sigU" placeholder="Choose username" />
+            <label style="margin-top:10px;">New Password</label>
             <div class="pwd-wrapper">
               <input type="password" id="sigP" placeholder="Choose password" />
               <button class="pwd-toggle" onclick="togglePassword('sigP', this)">👁️</button>
@@ -124,13 +120,11 @@
           <button class="btn btn-warning" style="width:100%" onclick="handleAuth('signup')">Create Account</button>
         </div>
       </div>
-
     </div>
   </section>
 
   <section id="dashboardPage" class="hidden">
     <div class="app-shell">
-      
       <aside class="sidebar">
         <div class="logo">SignBridge</div>
         <div class="subtitle" id="welcomeUser">Menu</div>
@@ -150,7 +144,7 @@
           </div>
           <div class="form-group" style="margin-bottom: 0;">
             <label style="font-size: 13px; color: #cbd5e1;">Predicting Speed: <span id="speed_val" style="color:#60a5fa">5</span> f</label>
-            <input type="range" id="speed_slider" min="2" max="20" value="5">
+            <input type="range" id="speed_slider" min="2" max="25" value="5">
           </div>
         </div>
 
@@ -165,7 +159,6 @@
 
         <div id="page-dashboard">
           <div class="grid grid-2">
-            
             <div>
               <div class="card">
                 <h2 class="section-title" style="margin-bottom:15px;">Camera Feed</h2>
@@ -173,9 +166,7 @@
                   <video id="input_video" autoplay playsinline></video>
                   <canvas id="output_canvas"></canvas>
                 </div>
-                <div style="display:flex; gap:10px; margin-top: 15px;">
-                  <button class="btn" style="width: 100%;" id="camBtn" onclick="startWebcam()">Start AI Webcam</button>
-                </div>
+                <button class="btn" style="width: 100%; margin-top: 15px;" id="camBtn" onclick="startWebcam()">Start AI Webcam</button>
               </div>
             </div>
               
@@ -191,15 +182,14 @@
                     <h1 id="liveLetter">-</h1>
                   </div>
                 </div>
-
                 <p id="liveTyping" style="color:#94a3b8; font-size:16px; margin-top:15px;">Typing: </p>
                 <p id="wordMeaning" style="color: #f59e0b; margin-top: 10px; font-style: italic; min-height: 40px;">Meaning will appear here</p>
                 <button class="btn btn-outline" style="margin-top:10px; font-size:12px; padding: 8px 12px;" onclick="saveCurrentWordToVocab()">⭐ Save to Vocabulary</button>
               </div>
               
               <div class="card" style="background:#0b1220;">
-                <p style="color:#94a3b8;">Full Sentence (Press Clear to save to History)</p>
-                <p id="translatedText" style="font-size:24px; margin-top:8px; font-weight:bold; min-height:35px;">Waiting for signs...</p>
+                <p style="color:#94a3b8;">Full Sentence</p>
+                <p id="translatedText" style="font-size:24px; margin-top:8px; font-weight:bold; min-height:35px;">Waiting...</p>
               </div>
               
               <div style="display:flex; gap:10px; margin-bottom: 20px;">
@@ -207,56 +197,46 @@
                 <button class="btn btn-danger" style="flex:1" onclick="sendCommand('clear')">Clear & Save</button>
               </div>
 
-              <div class="grid grid-2" style="grid-template-columns: 1fr 1fr;">
-                <div class="card" style="background:#0b1220; padding:15px;">
-                  <p style="color:#94a3b8;">Confidence</p>
-                  <p id="confidenceScore" style="font-size:22px; margin-top:5px; color:#22c55e;">0.0%</p>
-                </div>
-                <div class="card" style="background:#0b1220; padding:15px; display: none;">
-                  <p style="color:#94a3b8;">Mood</p>
-                  <p id="emotionDisplay" style="font-size:22px; margin-top:5px; color:#f59e0b; text-transform: capitalize;">--</p>
-                </div>
+              <div class="card" style="background:#0b1220; padding:15px;">
+                <p style="color:#94a3b8;">AI Confidence</p>
+                <p id="confidenceScore" style="font-size:22px; margin-top:5px; color:#22c55e;">0.0%</p>
               </div>
             </div>
           </div>
         </div>
 
         <div id="page-history" class="hidden card">
-          <div style="display:flex; justify-content:space-between; margin-bottom: 15px; align-items:center;">
-            <p style="color: #94a3b8;">Sentences are saved here when you click "Clear & Save".</p>
-            <button class="btn btn-outline" onclick="loadHistory()">Refresh List</button>
-          </div>
-          <table>
-            <thead><tr><th style="width:200px;">Time</th><th>Translated Sentence</th></tr></thead>
-            <tbody id="historyTableBody"><tr><td colspan="2" style="text-align:center;">Click refresh to load history</td></tr></tbody>
+          <table id="historyTable">
+            <thead><tr><th>Time</th><th>Translated Sentence</th></tr></thead>
+            <tbody id="historyTableBody"></tbody>
           </table>
         </div>
 
         <div id="page-vocab" class="hidden card">
-          <div style="display:flex; justify-content:space-between; margin-bottom: 15px; align-items:center;">
-            <p style="color: #94a3b8;">Your Personal Dictionary of Saved Signs.</p>
-            <button class="btn btn-outline" onclick="loadVocab()">Refresh List</button>
-          </div>
-          <table>
-            <thead><tr><th style="width:200px;">Word</th><th>Meaning</th><th style="width:100px;">Action</th></tr></thead>
-            <tbody id="vocabTableBody"><tr><td colspan="3" style="text-align:center;">No words saved yet.</td></tr></tbody>
+          <table id="vocabTable">
+            <thead><tr><th>Word</th><th>Meaning</th><th>Action</th></tr></thead>
+            <tbody id="vocabTableBody"></tbody>
           </table>
         </div>
-
       </main>
     </div>
   </section>
 
   <script>
     let ws = null;
-    let reconnectTimer = null;
     let cameraInstance = null;
-    let lastEmo = 0;
+    let lastProcessedTime = 0;
+    const FRAME_RATE_LIMIT = 120; // 🔥 120ms = ~8 FPS (Safe for Render Free Tier)
 
-    // ==========================================
-    // UI & AUTHENTICATION FUNCTIONS
-    // ==========================================
-    
+    const videoElement = document.getElementById('input_video');
+    const canvasElement = document.getElementById('output_canvas');
+    const canvasCtx = canvasElement.getContext('2d');
+    const accSlider = document.getElementById('acc_slider');
+    const speedSlider = document.getElementById('speed_slider');
+
+    accSlider.oninput = () => document.getElementById('acc_val').innerText = accSlider.value;
+    speedSlider.oninput = () => document.getElementById('speed_val').innerText = speedSlider.value;
+
     function showToast(msg, type = 'success') {
       const toast = document.getElementById('toast');
       toast.textContent = msg;
@@ -267,26 +247,15 @@
 
     function togglePassword(inputId, btn) {
       const input = document.getElementById(inputId);
-      if (input.type === 'password') {
-        input.type = 'text';
-        btn.innerText = '🙈';
-      } else {
-        input.type = 'password';
-        btn.innerText = '👁️';
-      }
+      input.type = input.type === 'password' ? 'text' : 'password';
+      btn.innerText = input.type === 'password' ? '👁️' : '🙈';
     }
 
     function switchAuth(type) {
+      document.getElementById('loginFields').classList.toggle('hidden', type !== 'login');
+      document.getElementById('signupFields').classList.toggle('hidden', type !== 'signup');
       document.getElementById('tabLogin').classList.toggle('active', type === 'login');
       document.getElementById('tabSignup').classList.toggle('active', type === 'signup');
-      
-      if (type === 'login') {
-        document.getElementById('loginFields').classList.remove('hidden');
-        document.getElementById('signupFields').classList.add('hidden');
-      } else {
-        document.getElementById('loginFields').classList.add('hidden');
-        document.getElementById('signupFields').classList.remove('hidden');
-      }
     }
 
     async function handleAuth(type) {
@@ -294,11 +263,7 @@
       const pId = type === 'login' ? 'logP' : 'sigP';
       const username = document.getElementById(uId).value.trim();
       const password = document.getElementById(pId).value.trim();
-
-      if (!username || !password) {
-        showToast("Please fill all fields", "error");
-        return;
-      }
+      if (!username || !password) return showToast("Fields required", "error");
 
       try {
         const res = await fetch(`/${type}`, {
@@ -306,9 +271,7 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ username, password })
         });
-        
         const data = await res.json();
-        
         if (res.ok) {
           if (type === 'login') {
             sessionStorage.setItem('jwt_token', data.access_token);
@@ -316,291 +279,132 @@
             document.getElementById('authPage').classList.add('hidden');
             document.getElementById('dashboardPage').classList.remove('hidden');
             document.getElementById('welcomeUser').innerText = `Welcome, ${username}`;
-            showToast("Login Successful!");
+            showToast("Logged In");
           } else {
-            showToast("Account created! Please login.");
+            showToast("Account Created");
             switchAuth('login');
           }
-        } else {
-          showToast(data.detail || "Authentication failed", "error");
-        }
-      } catch (err) {
-        showToast("Server error. Check connection.", "error");
-      }
+        } else showToast(data.detail, "error");
+      } catch (e) { showToast("Connection Error", "error"); }
     }
 
     function logoutUser() {
-      sessionStorage.removeItem('jwt_token');
-      sessionStorage.removeItem('username');
-      if (ws) ws.close();
-      if (cameraInstance) cameraInstance.stop();
-      document.getElementById('authPage').classList.remove('hidden');
-      document.getElementById('dashboardPage').classList.add('hidden');
-      showToast("Logged out successfully");
+      sessionStorage.clear();
+      location.reload();
     }
 
-    // ==========================================
-    // NAVIGATION & SETTINGS
-    // ==========================================
-
-    function switchPage(pageId) {
-      // Update sidebar buttons
-      document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
-      document.getElementById('nav-' + pageId).classList.add('active');
-
-      // Update titles and pages
-      const titles = { 'dashboard': 'Dashboard', 'history': 'Translation History', 'vocab': 'Saved Vocabulary' };
-      document.getElementById('pageTitle').innerText = titles[pageId];
-
-      document.getElementById('page-dashboard').classList.add('hidden');
-      document.getElementById('page-history').classList.add('hidden');
-      document.getElementById('page-vocab').classList.add('hidden');
-
-      document.getElementById('page-' + pageId).classList.remove('hidden');
-
-      if (pageId === 'history') loadHistory();
-      if (pageId === 'vocab') loadVocab();
+    function switchPage(p) {
+      ['dashboard', 'history', 'vocab'].forEach(id => {
+        document.getElementById(`page-${id}`).classList.toggle('hidden', id !== p);
+        document.getElementById(`nav-${id}`).classList.toggle('active', id === p);
+      });
+      if (p === 'history') loadHistory();
+      if (p === 'vocab') loadVocab();
     }
 
     function toggleSettings() {
-      const panel = document.getElementById('settings-panel');
-      const icon = document.getElementById('settings-icon');
-      if (panel.classList.contains('hidden')) {
-        panel.classList.remove('hidden');
-        icon.innerText = '▲';
-      } else {
-        panel.classList.add('hidden');
-        icon.innerText = '▼';
-      }
+      const p = document.getElementById('settings-panel');
+      p.classList.toggle('hidden');
+      document.getElementById('settings-icon').innerText = p.classList.contains('hidden') ? '▼' : '▲';
     }
 
-    // ==========================================
-    // API FETCH FUNCTIONS
-    // ==========================================
-
     async function loadHistory() {
-      try {
-        const res = await fetch('/api/history');
-        const data = await res.json();
-        const tbody = document.getElementById('historyTableBody');
-        tbody.innerHTML = '';
-        if (data.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="2" style="text-align:center;">No history found</td></tr>';
-          return;
-        }
-        data.forEach(row => {
-          tbody.innerHTML += `<tr><td>${row.time}</td><td style="color:#60a5fa; font-weight:bold;">${row.sentence}</td></tr>`;
-        });
-      } catch (e) {
-        showToast("Failed to load history", "error");
-      }
+      const res = await fetch('/api/history');
+      const data = await res.json();
+      document.getElementById('historyTableBody').innerHTML = data.map(r => `<tr><td>${r.time}</td><td>${r.sentence}</td></tr>`).join('');
     }
 
     async function loadVocab() {
-      try {
-        const res = await fetch('/api/vocab');
-        const data = await res.json();
-        const tbody = document.getElementById('vocabTableBody');
-        tbody.innerHTML = '';
-        if (data.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;">No vocabulary saved</td></tr>';
-          return;
-        }
-        data.forEach(row => {
-          tbody.innerHTML += `<tr>
-            <td style="color:#22c55e; font-weight:bold; text-transform:capitalize;">${row.word}</td>
-            <td style="font-size:14px;">${row.meaning}</td>
-            <td><button class="btn btn-danger" style="padding: 5px 10px; font-size: 12px;" onclick="deleteVocab(${row.id})">Delete</button></td>
-          </tr>`;
-        });
-      } catch (e) {
-        showToast("Failed to load vocabulary", "error");
-      }
+      const res = await fetch('/api/vocab');
+      const data = await res.json();
+      document.getElementById('vocabTableBody').innerHTML = data.map(r => `<tr><td>${r.word}</td><td>${r.meaning}</td><td><button class="btn btn-danger" onclick="deleteVocab(${r.id})">Del</button></td></tr>`).join('');
     }
 
     async function saveCurrentWordToVocab() {
       const word = document.getElementById('predictedWord').innerText;
-      const meaning = document.getElementById('wordMeaning').innerText.replace("Meaning: ", "");
-      const username = sessionStorage.getItem('username');
-
-      if (!word || word === "..." || !username) {
-        showToast("No valid word to save", "error");
-        return;
-      }
-
-      try {
-        const res = await fetch('/api/vocab', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username, word, meaning })
-        });
-        if (res.ok) {
-          showToast("Word saved to vocabulary!");
-        }
-      } catch (e) {
-        showToast("Failed to save word", "error");
-      }
+      const meaning = document.getElementById('wordMeaning').innerText;
+      if (word === "...") return showToast("No word detected", "error");
+      await fetch('/api/vocab', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: sessionStorage.getItem('username'), word, meaning })
+      });
+      showToast("Saved!");
     }
 
     async function deleteVocab(id) {
-      try {
-        await fetch(`/api/vocab/${id}`, { method: 'DELETE' });
-        loadVocab();
-        showToast("Word deleted");
-      } catch (e) {
-        showToast("Failed to delete", "error");
-      }
+      await fetch(`/api/vocab/${id}`, { method: 'DELETE' });
+      loadVocab();
     }
 
-    
-    const videoElement = document.getElementById('input_video');
-    const canvasElement = document.getElementById('output_canvas');
-    const canvasCtx = canvasElement.getContext('2d');
-    const accSlider = document.getElementById('acc_slider');
-    const speedSlider = document.getElementById('speed_slider');
-    
-    accSlider.oninput = () => document.getElementById('acc_val').innerText = accSlider.value;
-    speedSlider.oninput = () => document.getElementById('speed_val').innerText = speedSlider.value;
-    
-    // ✅ WEBSOCKET CONNECT WITH AUTO-RECONNECT
     function connectServer() {
       const token = sessionStorage.getItem('jwt_token');
-      const wsProtocol = location.protocol === 'https:' ? 'wss://' : 'ws://';
-    
-      if (ws) ws.close();
-    
-      ws = new WebSocket(`${wsProtocol}${location.host}/ws?token=${token}`);
-    
+      const prot = location.protocol === 'https:' ? 'wss://' : 'ws://';
+      ws = new WebSocket(`${prot}${location.host}/ws?token=${token}`);
+      
       ws.onopen = () => {
-        console.log("✅ Connected");
         document.getElementById('conn_status').innerText = "Online";
         document.getElementById('conn_status').style.background = "#22c55e";
-        if (reconnectTimer) clearTimeout(reconnectTimer);
       };
-    
+
       ws.onclose = () => {
-        console.log("❌ Disconnected. Reconnecting...");
         document.getElementById('conn_status').innerText = "Offline";
         document.getElementById('conn_status').style.background = "#ef4444";
-    
-        reconnectTimer = setTimeout(connectServer, 2000); // 🔥 AUTO RECONNECT
+        setTimeout(connectServer, 3000);
       };
-    
-      ws.onerror = () => {
-        ws.close();
-      };
-    
+
       ws.onmessage = (e) => {
-        const data = JSON.parse(e.data);
-    
-        // ✅ SAFE UI UPDATES
-        document.getElementById('translatedText').innerText = data.text || "";
-        document.getElementById('liveTyping').innerText = "Typing: " + (data.current_word || "");
-    
-        document.getElementById('confidenceScore').innerText =
-          ((data.confidence || 0) * 100).toFixed(1) + "%";
-    
-        // ✅ LETTER DISPLAY FIX
-        if (data.current_letter && data.current_letter !== "nothing") {
-          document.getElementById('liveLetter').innerText = data.current_letter.toUpperCase();
-        } else {
-          document.getElementById('liveLetter').innerText = "-";
+        const d = JSON.parse(e.data);
+        document.getElementById('translatedText').innerText = d.text || "Waiting...";
+        document.getElementById('liveTyping').innerText = "Typing: " + (d.current_word || "");
+        document.getElementById('confidenceScore').innerText = ((d.confidence || 0) * 100).toFixed(1) + "%";
+        document.getElementById('liveLetter').innerText = (d.current_letter && d.current_letter !== 'nothing') ? d.current_letter.toUpperCase() : '-';
+        if (d.completed_word) {
+            document.getElementById('predictedWord').innerText = d.completed_word;
+            document.getElementById('wordMeaning').innerText = d.meaning;
         }
-    
-        // ✅ WORD UPDATE
-        if (data.completed_word) {
-          document.getElementById('predictedWord').innerText = data.completed_word;
-          document.getElementById('wordMeaning').innerText =
-            "Meaning: " + (data.meaning || "Detecting...");
-        }
-    
-        // ✅ GLOW EFFECT
-        if ((data.confidence || 0) > 0.9) {
-          document.documentElement.style.setProperty('--glow', '#22c55e');
-        } else {
-          document.documentElement.style.setProperty('--glow', 'transparent');
-        }
-    
-        // ✅ SPEECH
-        if (data.speak && 'speechSynthesis' in window) {
-          window.speechSynthesis.cancel();
-          window.speechSynthesis.speak(new SpeechSynthesisUtterance(data.speak));
+        if (d.speak && 'speechSynthesis' in window) {
+            window.speechSynthesis.cancel();
+            window.speechSynthesis.speak(new SpeechSynthesisUtterance(d.speak));
         }
       };
     }
+
+    const hands = new Hands({ locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}` });
+    hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.6, minTrackingConfidence: 0.6 });
     
-    // ✅ MEDIAPIPE SETUP
-    const hands = new Hands({
-      locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
-    });
-    
-    hands.setOptions({
-      maxNumHands: 1,
-      modelComplexity: 1,
-      minDetectionConfidence: 0.6,
-      minTrackingConfidence: 0.6
-    });
-    
-    // ✅ OPTIMIZED LANDMARK SEND (MAJOR FIX)
-    hands.onResults((results) => {
+    hands.onResults((res) => {
       canvasCtx.save();
       canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
-      canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
-    
-      let payload = {
-        landmarks: null,
-        config: {
-          threshold: parseFloat(accSlider.value) / 100,
-          buffer: parseInt(speedSlider.value)
+      canvasCtx.drawImage(res.image, 0, 0, canvasElement.width, canvasElement.height);
+
+      const now = Date.now();
+      if (now - lastProcessedTime > FRAME_RATE_LIMIT) {
+        lastProcessedTime = now;
+        if (res.multiHandLandmarks && res.multiHandLandmarks.length > 0) {
+          const lm = res.multiHandLandmarks[0];
+          drawConnectors(canvasCtx, lm, HAND_CONNECTIONS, { color: '#00FF00', lineWidth: 4 });
+          if (ws && ws.readyState === 1) {
+            ws.send(JSON.stringify({ 
+                landmarks: lm.map(p => [p.x, p.y, p.z]),
+                config: { threshold: parseFloat(accSlider.value)/100, buffer: parseInt(speedSlider.value) }
+            }));
+          }
         }
-      };
-    
-      if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-        const lm = results.multiHandLandmarks[0];
-    
-        drawConnectors(canvasCtx, lm, HAND_CONNECTIONS, { color: '#00FF00', lineWidth: 4 });
-        drawLandmarks(canvasCtx, lm, { color: '#FF0000', lineWidth: 2 });
-    
-        // 🔥 OPTIMIZED: SEND ONLY NUMBERS (NOT FULL OBJECT)
-        payload.landmarks = lm.map(p => [p.x, p.y, p.z]);
       }
-    
-      if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify(payload));
-      }
-    
       canvasCtx.restore();
     });
-    
-    // ✅ START CAMERA
+
     function startWebcam() {
-      const camBtn = document.getElementById('camBtn');
-      camBtn.innerText = "Starting...";
-      camBtn.disabled = true;
-    
-      const isMobile = window.innerWidth <= 768;
-      const camWidth = isMobile ? 640 : 1280;
-      const camHeight = isMobile ? 480 : 720;
-    
-      cameraInstance = new Camera(videoElement, {
-        onFrame: async () => { await hands.send({ image: videoElement }); },
-        width: camWidth,
-        height: camHeight
-      });
-    
+      cameraInstance = new Camera(videoElement, { onFrame: async () => { await hands.send({ image: videoElement }); }, width: 640, height: 480 });
       cameraInstance.start().then(() => {
-        camBtn.innerText = "Webcam Running ✔️";
-        camBtn.style.background = "#22c55e";
+        document.getElementById('camBtn').innerText = "Webcam Running ✔️";
+        document.getElementById('camBtn').style.background = "#22c55e";
         connectServer();
       });
     }
-    
-    // COMMANDS
-    function sendCommand(cmd) {
-      if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ command: cmd }));
-      }
-    }
+
+    function sendCommand(cmd) { if (ws && ws.readyState === 1) ws.send(JSON.stringify({ command: cmd })); }
   </script>
 </body>
 </html>
