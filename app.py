@@ -14,7 +14,6 @@ app = FastAPI()
 def root():
     return {"status": "SignBridge running"}
 
-
 MODEL_PATH = "gesture_model_optimized.tflite"
 
 if not os.path.exists(MODEL_PATH):
