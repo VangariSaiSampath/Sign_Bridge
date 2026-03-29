@@ -252,6 +252,206 @@
     let reconnectTimer = null;
     let cameraInstance = null;
     let lastEmo = 0;
+
+    // ==========================================
+    // UI & AUTHENTICATION FUNCTIONS
+    // ==========================================
+    
+    function showToast(msg, type = 'success') {
+      const toast = document.getElementById('toast');
+      toast.textContent = msg;
+      toast.className = `toast ${type}`;
+      toast.classList.remove('hidden');
+      setTimeout(() => toast.classList.add('hidden'), 3000);
+    }
+
+    function togglePassword(inputId, btn) {
+      const input = document.getElementById(inputId);
+      if (input.type === 'password') {
+        input.type = 'text';
+        btn.innerText = '🙈';
+      } else {
+        input.type = 'password';
+        btn.innerText = '👁️';
+      }
+    }
+
+    function switchAuth(type) {
+      document.getElementById('tabLogin').classList.toggle('active', type === 'login');
+      document.getElementById('tabSignup').classList.toggle('active', type === 'signup');
+      
+      if (type === 'login') {
+        document.getElementById('loginFields').classList.remove('hidden');
+        document.getElementById('signupFields').classList.add('hidden');
+      } else {
+        document.getElementById('loginFields').classList.add('hidden');
+        document.getElementById('signupFields').classList.remove('hidden');
+      }
+    }
+
+    async function handleAuth(type) {
+      const uId = type === 'login' ? 'logU' : 'sigU';
+      const pId = type === 'login' ? 'logP' : 'sigP';
+      const username = document.getElementById(uId).value.trim();
+      const password = document.getElementById(pId).value.trim();
+
+      if (!username || !password) {
+        showToast("Please fill all fields", "error");
+        return;
+      }
+
+      try {
+        const res = await fetch(`/${type}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        });
+        
+        const data = await res.json();
+        
+        if (res.ok) {
+          if (type === 'login') {
+            sessionStorage.setItem('jwt_token', data.access_token);
+            sessionStorage.setItem('username', username);
+            document.getElementById('authPage').classList.add('hidden');
+            document.getElementById('dashboardPage').classList.remove('hidden');
+            document.getElementById('welcomeUser').innerText = `Welcome, ${username}`;
+            showToast("Login Successful!");
+          } else {
+            showToast("Account created! Please login.");
+            switchAuth('login');
+          }
+        } else {
+          showToast(data.detail || "Authentication failed", "error");
+        }
+      } catch (err) {
+        showToast("Server error. Check connection.", "error");
+      }
+    }
+
+    function logoutUser() {
+      sessionStorage.removeItem('jwt_token');
+      sessionStorage.removeItem('username');
+      if (ws) ws.close();
+      if (cameraInstance) cameraInstance.stop();
+      document.getElementById('authPage').classList.remove('hidden');
+      document.getElementById('dashboardPage').classList.add('hidden');
+      showToast("Logged out successfully");
+    }
+
+    // ==========================================
+    // NAVIGATION & SETTINGS
+    // ==========================================
+
+    function switchPage(pageId) {
+      // Update sidebar buttons
+      document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
+      document.getElementById('nav-' + pageId).classList.add('active');
+
+      // Update titles and pages
+      const titles = { 'dashboard': 'Dashboard', 'history': 'Translation History', 'vocab': 'Saved Vocabulary' };
+      document.getElementById('pageTitle').innerText = titles[pageId];
+
+      document.getElementById('page-dashboard').classList.add('hidden');
+      document.getElementById('page-history').classList.add('hidden');
+      document.getElementById('page-vocab').classList.add('hidden');
+
+      document.getElementById('page-' + pageId).classList.remove('hidden');
+
+      if (pageId === 'history') loadHistory();
+      if (pageId === 'vocab') loadVocab();
+    }
+
+    function toggleSettings() {
+      const panel = document.getElementById('settings-panel');
+      const icon = document.getElementById('settings-icon');
+      if (panel.classList.contains('hidden')) {
+        panel.classList.remove('hidden');
+        icon.innerText = '▲';
+      } else {
+        panel.classList.add('hidden');
+        icon.innerText = '▼';
+      }
+    }
+
+    // ==========================================
+    // API FETCH FUNCTIONS
+    // ==========================================
+
+    async function loadHistory() {
+      try {
+        const res = await fetch('/api/history');
+        const data = await res.json();
+        const tbody = document.getElementById('historyTableBody');
+        tbody.innerHTML = '';
+        if (data.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="2" style="text-align:center;">No history found</td></tr>';
+          return;
+        }
+        data.forEach(row => {
+          tbody.innerHTML += `<tr><td>${row.time}</td><td style="color:#60a5fa; font-weight:bold;">${row.sentence}</td></tr>`;
+        });
+      } catch (e) {
+        showToast("Failed to load history", "error");
+      }
+    }
+
+    async function loadVocab() {
+      try {
+        const res = await fetch('/api/vocab');
+        const data = await res.json();
+        const tbody = document.getElementById('vocabTableBody');
+        tbody.innerHTML = '';
+        if (data.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;">No vocabulary saved</td></tr>';
+          return;
+        }
+        data.forEach(row => {
+          tbody.innerHTML += `<tr>
+            <td style="color:#22c55e; font-weight:bold; text-transform:capitalize;">${row.word}</td>
+            <td style="font-size:14px;">${row.meaning}</td>
+            <td><button class="btn btn-danger" style="padding: 5px 10px; font-size: 12px;" onclick="deleteVocab(${row.id})">Delete</button></td>
+          </tr>`;
+        });
+      } catch (e) {
+        showToast("Failed to load vocabulary", "error");
+      }
+    }
+
+    async function saveCurrentWordToVocab() {
+      const word = document.getElementById('predictedWord').innerText;
+      const meaning = document.getElementById('wordMeaning').innerText.replace("Meaning: ", "");
+      const username = sessionStorage.getItem('username');
+
+      if (!word || word === "..." || !username) {
+        showToast("No valid word to save", "error");
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/vocab', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, word, meaning })
+        });
+        if (res.ok) {
+          showToast("Word saved to vocabulary!");
+        }
+      } catch (e) {
+        showToast("Failed to save word", "error");
+      }
+    }
+
+    async function deleteVocab(id) {
+      try {
+        await fetch(`/api/vocab/${id}`, { method: 'DELETE' });
+        loadVocab();
+        showToast("Word deleted");
+      } catch (e) {
+        showToast("Failed to delete", "error");
+      }
+    }
+
     
     const videoElement = document.getElementById('input_video');
     const canvasElement = document.getElementById('output_canvas');
