@@ -10,18 +10,23 @@ from fastapi import FastAPI
 
 app = FastAPI()
 
-@app.get("/predict-test")
-def predict_test():
-    coords = np.random.rand(63).astype(np.float32)
+@app.post("/predict")
+def predict(data: dict):
+    coords = data["landmarks"]
+
     input_data = np.array([coords], dtype=np.float32)
 
     interpreter.set_tensor(input_details[0]['index'], input_data)
     interpreter.invoke()
+
     p = interpreter.get_tensor(output_details[0]['index'])[0]
 
+    prediction = int(np.argmax(p))
+    confidence = float(np.max(p))
+
     return {
-        "prediction": int(np.argmax(p)),
-        "confidence": float(np.max(p))
+        "prediction": prediction,
+        "confidence": confidence
     }
 
 MODEL_PATH = "gesture_model_optimized.tflite"
