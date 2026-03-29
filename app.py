@@ -14,6 +14,16 @@ import os
 import requests
 import traceback
 
+# --- RENDER FREE TIER MEMORY SAVERS ---
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' # Disable TF debug logs
+os.environ["CUDA_VISIBLE_DEVICES"] = "-1" # Force CPU only
+
+# Force TensorFlow to only use 1 thread to save RAM
+tf.config.threading.set_inter_op_parallelism_threads(1)
+tf.config.threading.set_intra_op_parallelism_threads(1)
+# --------------------------------------
+
+
 # --- NEW: SQLAlchemy Imports ---
 from sqlalchemy import create_engine, Column, Integer, String, DateTime
 from sqlalchemy.orm import sessionmaker, declarative_base
@@ -104,12 +114,8 @@ no_hand_count = 0
 
 def run_emotion_async(img, threshold):
     global current_emotion
-    try:
-        res = DeepFace.analyze(img, actions=['emotion'], enforce_detection=False, silent=True)
-        score = res[0]['emotion'][res[0]['dominant_emotion']]
-        if score >= (threshold * 100):
-            current_emotion = res[0]['dominant_emotion']
-    except: pass
+    # DeepFace disabled for Render Free Tier (Memory limit)
+    current_emotion = "neutral"
 
 def get_meaning(word):
     if not word: return ""
