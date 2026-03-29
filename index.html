@@ -4,104 +4,117 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>SignBridge AI Dashboard</title>
+
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+
   <style>
+    :root { --glow: transparent; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Inter', sans-serif; background: #0f172a; color: #ffffff; min-height: 100vh; }
+    body { font-family: Arial, sans-serif; background: #0f172a; color: #ffffff; min-height: 100vh; overflow-x: hidden; }
     .hidden { display: none !important; }
     .app-shell { display: flex; min-height: 100vh; }
-    .sidebar { width: 260px; background: #020617; border-right: 1px solid #1e293b; padding: 24px; display: flex; flex-direction: column; }
-    .logo { font-size: 24px; font-weight: 800; color: #60a5fa; margin-bottom: 30px; }
-    .nav-btn { width: 100%; background: transparent; color: #94a3b8; border: none; padding: 12px; text-align: left; border-radius: 8px; cursor: pointer; margin-bottom: 8px; transition: 0.2s; }
+    
+    .sidebar { width: 250px; background: #020617; border-right: 1px solid rgba(255,255,255,0.1); padding: 24px 16px; display: flex; flex-direction: column; }
+    .logo { font-size: 24px; font-weight: bold; color: #60a5fa; margin-bottom: 8px; }
+    .subtitle { color: #94a3b8; font-size: 14px; margin-bottom: 28px; }
+    .nav-btn { width: 100%; background: transparent; color: #cbd5e1; border: none; padding: 14px 16px; text-align: left; border-radius: 12px; cursor: pointer; margin-bottom: 10px; font-size: 15px; transition: 0.3s; }
     .nav-btn:hover, .nav-btn.active { background: #2563eb; color: #fff; }
-    .main { flex: 1; padding: 30px; overflow-y: auto; }
     
-    /* FIX: GRID LAYOUT - KEEPS CAMERA STEADY */
-    .dashboard-grid { display: grid; grid-template-columns: 1fr 400px; gap: 24px; align-items: start; }
-    .card { background: #111827; border: 1px solid #1e293b; border-radius: 16px; padding: 24px; }
+    .main { flex: 1; padding: 24px; max-width: 100%; }
+    .topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
     
-    .preview-box { width: 100%; aspect-ratio: 4/3; background: #000; border-radius: 12px; position: relative; overflow: hidden; }
-    #output_canvas { width: 100%; height: 100%; object-fit: cover; }
+    .btn { background: #2563eb; color: white; border: none; padding: 12px 18px; border-radius: 12px; cursor: pointer; font-weight: bold; transition: 0.3s;}
+    .btn-outline { background: transparent; border: 1px solid rgba(255,255,255,0.15); color: #fff; }
+    .btn-danger { background: #ef4444; }
+    .btn-warning { background: #f59e0b; }
+    
+    .card { background: #111827; border: 1px solid rgba(255,255,255,0.08); border-radius: 20px; padding: 20px; box-shadow: 0 8px 25px rgba(0,0,0,0.25); margin-bottom: 20px;}
+    .grid { display: grid; gap: 20px; }
+    .grid-2 { grid-template-columns: 1.5fr 1fr; }
+    
+    .preview-box { background: rgba(37,99,235,0.08); border-radius: 18px; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; padding: 10px; aspect-ratio: 4/3; }
+    #output_canvas { width: 100%; height: 100%; border-radius: 12px; border: 4px solid var(--glow); object-fit: cover; }
     video { display: none; }
 
-    /* FIX: PROFESSIONAL TEXT WRAPPING */
+    .result-box { background: rgba(37,99,235,0.12); border: 1px solid rgba(96,165,250,0.3); border-radius: 18px; padding: 20px; }
+    .result-box h2 { font-size: 38px; color: #60a5fa; margin-top: 5px; text-transform: uppercase; }
+    
     #translatedText { 
-        font-size: 24px; font-weight: 600; color: #e2e8f0; line-height: 1.5;
+        font-size: 24px; font-weight: bold; margin-top: 8px; min-height: 80px;
         word-wrap: break-word; overflow-wrap: break-word; white-space: normal;
-        min-height: 100px; padding: 15px; background: #020617; border-radius: 12px;
     }
 
-    .live-badge { background: #1e293b; border: 1px solid #3b82f6; border-radius: 12px; padding: 15px; text-align: center; }
-    .btn { background: #2563eb; color: white; border: none; padding: 12px; border-radius: 8px; cursor: pointer; font-weight: 600; width: 100%; }
-    .btn-danger { background: #ef4444; }
-    input[type=range] { width: 100%; accent-color: #3b82f6; }
-    table { width: 100%; border-collapse: collapse; }
-    th, td { padding: 12px; border-bottom: 1px solid #1e293b; text-align: left; }
+    .form-group { margin-bottom: 16px; }
+    input[type=range] { width: 100%; cursor: pointer; accent-color: #2563eb; }
+    
+    .live-badge { background: #020617; border: 1px solid rgba(96,165,250,0.3); border-radius: 12px; padding: 10px 20px; text-align: center; min-width: 80px;}
+    .live-badge h1 { color: #22c55e; font-size: 42px; line-height: 1; margin: 0; }
+
+    @media (max-width: 768px) { .grid-2 { grid-template-columns: 1fr !important; } }
   </style>
 </head>
 <body>
-  <div id="toast" class="toast hidden"></div>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="logo">SignBridge</div>
+      <div class="subtitle">AI Settings</div>
+      <div class="form-group">
+        <label style="font-size: 13px;">Strictness: <span id="acc_val">85</span>%</label>
+        <input type="range" id="acc_slider" min="70" max="98" value="85" oninput="acc_val.innerText=this.value">
+      </div>
+      <div class="form-group">
+        <label style="font-size: 13px;">Speed: <span id="speed_val">5</span> f</label>
+        <input type="range" id="speed_slider" min="2" max="20" value="5" oninput="speed_val.innerText=this.value">
+      </div>
+      <button class="nav-btn btn-danger" onclick="location.reload()" style="margin-top: auto;">Logout</button>
+    </aside>
 
-  <section id="authPage" style="display: flex; height: 100vh; align-items: center; justify-content: center;">
-    <div class="card" style="width: 400px;">
-        <h2 class="logo">SignBridge AI</h2>
-        <input type="text" id="logU" placeholder="Username" style="width:100%; padding:10px; margin-bottom:10px; border-radius:8px; border:none; background:#020617; color:white;">
-        <input type="password" id="logP" placeholder="Password" style="width:100%; padding:10px; margin-bottom:20px; border-radius:8px; border:none; background:#020617; color:white;">
-        <button class="btn" onclick="handleAuth('login')">Login</button>
-        <button class="nav-btn" style="text-align:center; margin-top:10px;" onclick="handleAuth('signup')">New? Sign Up</button>
-    </div>
-  </section>
+    <main class="main">
+      <div class="topbar">
+        <h1>Dashboard</h1>
+        <span id="conn_status" style="padding: 8px 15px; border-radius: 8px; background: #ef4444; font-weight: bold;">Offline</span>
+      </div>
 
-  <section id="dashboardPage" class="hidden">
-    <div class="app-shell">
-      <aside class="sidebar">
-        <div class="logo">SignBridge</div>
-        <button id="nav-dashboard" class="nav-btn active" onclick="switchPage('dashboard')">Dashboard</button>
-        <button id="nav-history" class="nav-btn" onclick="switchPage('history')">History</button>
-        <button id="nav-vocab" class="nav-btn" onclick="switchPage('vocab')">Vocabulary</button>
-        <div style="margin-top: 20px; padding: 10px; background: #020617; border-radius: 8px;">
-            <p style="font-size: 12px; color: #64748b;">STRICTNESS: <span id="acc_val">85</span>%</p>
-            <input type="range" id="acc_slider" min="70" max="98" value="85" oninput="acc_val.innerText=this.value">
-        </div>
-        <button class="nav-btn btn-danger" style="margin-top:auto; color:white;" onclick="location.reload()">Logout</button>
-      </aside>
-
-      <main class="main">
-        <div id="page-dashboard" class="dashboard-grid">
-          <div class="card">
-            <div class="preview-box">
-              <video id="input_video" autoplay playsinline></video>
-              <canvas id="output_canvas"></canvas>
-            </div>
-            <button class="btn" style="margin-top: 20px;" id="camBtn" onclick="startWebcam()">Enable Camera</button>
+      <div class="grid grid-2">
+        <div class="card">
+          <h2 style="margin-bottom:15px;">Camera Feed</h2>
+          <div class="preview-box">
+            <video id="input_video" autoplay playsinline></video>
+            <canvas id="output_canvas"></canvas>
           </div>
+          <button class="btn" style="width: 100%; margin-top: 15px;" id="camBtn" onclick="startWebcam()">Start AI Webcam</button>
+        </div>
 
-          <div class="card" style="display: flex; flex-direction: column; gap: 15px;">
-            <div class="live-badge">
-              <p style="font-size: 12px; color: #60a5fa;">CURRENT SIGN</p>
-              <h1 id="liveLetter" style="font-size: 48px;">-</h1>
+        <div>
+          <div class="card result-box">
+            <div style="display:flex; justify-content:space-between; align-items: center;">
+              <div>
+                <p style="color:#94a3b8;">Predicted Word</p>
+                <h2 id="predictedWord">...</h2>
+              </div>
+              <div class="live-badge">
+                <p style="color:#94a3b8; font-size:10px;">LIVE</p>
+                <h1 id="liveLetter">-</h1>
+              </div>
             </div>
-            <p id="wordMeaning" style="color: #f59e0b; font-style: italic; font-size: 14px;">Meaning will appear here...</p>
-            <p style="color: #94a3b8; font-size: 12px; font-weight: bold;">TRANSCRIPT</p>
-            <div id="translatedText">Waiting for gesture...</div>
-            <div style="display: flex; gap: 10px;">
-                <button class="btn" style="background: #1e293b;" onclick="sendCommand('backspace')">Delete</button>
-                <button class="btn btn-danger" onclick="sendCommand('clear')">Clear</button>
-            </div>
+            <p id="wordMeaning" style="color: #f59e0b; margin-top: 10px; font-style: italic;">Meaning will appear here</p>
+          </div>
+          
+          <div class="card" style="background:#0b1220;">
+            <p style="color:#94a3b8;">Full Sentence</p>
+            <div id="translatedText">Waiting for signs...</div>
+          </div>
+          
+          <div style="display:flex; gap:10px;">
+            <button class="btn btn-warning" style="flex:1" onclick="sendCommand('backspace')">Backspace</button>
+            <button class="btn btn-danger" style="flex:1" onclick="sendCommand('clear')">Clear All</button>
           </div>
         </div>
-
-        <div id="page-history" class="hidden card">
-            <table><thead><tr><th>Time</th><th>Sentence</th></tr></thead><tbody id="historyTableBody"></tbody></table>
-        </div>
-        <div id="page-vocab" class="hidden card">
-            <table><thead><tr><th>Word</th><th>Meaning</th></tr></thead><tbody id="vocabTableBody"></tbody></table>
-        </div>
-      </main>
-    </div>
-  </section>
+      </div>
+    </main>
+  </div>
 
   <script>
     let ws = null;
@@ -109,53 +122,48 @@
     const canvasElement = document.getElementById('output_canvas');
     const canvasCtx = canvasElement.getContext('2d');
 
-    async function handleAuth(type) {
-      const username = document.getElementById('logU').value;
-      const password = document.getElementById('logP').value;
-      const res = await fetch(`/${type}`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({username, password}) });
-      if (res.ok) {
-        if (type==='login') {
-            document.getElementById('authPage').classList.add('hidden');
-            document.getElementById('dashboardPage').classList.remove('hidden');
-        } else alert("Signup success, now login");
-      }
-    }
-
-    function switchPage(p) {
-        document.getElementById('page-dashboard').classList.toggle('hidden', p !== 'dashboard');
-        document.getElementById('page-history').classList.toggle('hidden', p !== 'history');
-        document.getElementById('page-vocab').classList.toggle('hidden', p !== 'vocab');
-        if(p==='history') loadHistory();
-    }
-
-    async function loadHistory() {
-        const res = await fetch('/api/history'); const data = await res.json();
-        document.getElementById('historyTableBody').innerHTML = data.map(r => `<tr><td>${r.time}</td><td>${r.sentence}</td></tr>`).join('');
-    }
-
     function connectServer() {
       ws = new WebSocket(`ws://${location.host}/ws`);
+      ws.onopen = () => {
+        document.getElementById('conn_status').innerText = "Online";
+        document.getElementById('conn_status').style.background = "#22c55e";
+      };
       ws.onmessage = (e) => {
-        const d = JSON.parse(e.data);
-        document.getElementById('translatedText').innerText = d.text || "Waiting...";
-        document.getElementById('liveLetter').innerText = d.current_letter?.toUpperCase() || '-';
-        if (d.meaning) document.getElementById('wordMeaning').innerText = d.meaning;
-        if (d.speak) window.speechSynthesis.speak(new SpeechSynthesisUtterance(d.speak));
+        const data = JSON.parse(e.data);
+        document.getElementById('translatedText').innerText = data.text || "Waiting...";
+        document.getElementById('liveLetter').innerText = (data.current_letter && data.current_letter !== "nothing") ? data.current_letter.toUpperCase() : "-";
+        
+        if (data.completed_word) {
+          document.getElementById('predictedWord').innerText = data.completed_word;
+          document.getElementById('wordMeaning').innerText = data.meaning;
+        }
+
+        if (data.speak) {
+          window.speechSynthesis.cancel();
+          window.speechSynthesis.speak(new SpeechSynthesisUtterance(data.speak));
+        }
+
+        if (data.confidence > 0.9) {
+          document.documentElement.style.setProperty('--glow', '#22c55e');
+        } else {
+          document.documentElement.style.setProperty('--glow', 'transparent');
+        }
       };
     }
 
     const hands = new Hands({ locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}` });
+    hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.6 });
     hands.onResults((res) => {
       canvasCtx.save();
       canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
       canvasCtx.drawImage(res.image, 0, 0, canvasElement.width, canvasElement.height);
       if (res.multiHandLandmarks && res.multiHandLandmarks[0]) {
-        drawConnectors(canvasCtx, res.multiHandLandmarks[0], HAND_CONNECTIONS, {color: '#3b82f6', lineWidth: 4});
+        drawConnectors(canvasCtx, res.multiHandLandmarks[0], HAND_CONNECTIONS, {color: '#00FF00', lineWidth: 4});
         if (ws?.readyState === 1) {
-            ws.send(JSON.stringify({ 
-                landmarks: res.multiHandLandmarks[0].map(p => [p.x, p.y, p.z]),
-                config: { threshold: document.getElementById('acc_slider').value / 100, buffer: 5 }
-            }));
+          ws.send(JSON.stringify({
+            landmarks: res.multiHandLandmarks[0].map(p => [p.x, p.y, p.z]),
+            config: { threshold: parseFloat(acc_slider.value)/100, buffer: parseInt(speed_slider.value) }
+          }));
         }
       }
       canvasCtx.restore();
@@ -164,10 +172,10 @@
     function startWebcam() {
       new Camera(videoElement, { onFrame: async () => { await hands.send({ image: videoElement }); }, width: 640, height: 480 }).start();
       connectServer();
-      document.getElementById('camBtn').innerText = "AI System Active";
+      document.getElementById('camBtn').innerText = "Webcam Running ✔️";
     }
 
-    function sendCommand(cmd) { ws.send(JSON.stringify({command: cmd})); }
+    function sendCommand(cmd) { if (ws?.readyState === 1) ws.send(JSON.stringify({ command: cmd })); }
   </script>
 </body>
 </html>
