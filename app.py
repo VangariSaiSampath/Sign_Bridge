@@ -19,8 +19,6 @@ MODEL_PATH = "gesture_model_optimized.tflite"
 if not os.path.exists(MODEL_PATH):
     raise Exception(f"Model file not found: {MODEL_PATH}")
 
-app = FastAPI()
-
 # --- LOAD ASL MODEL ---
 import tflite_runtime.interpreter as tflite
 try:
@@ -36,7 +34,6 @@ try:
 
 except Exception as e:
     print("❌ Model loading failed:", e)
-labels = sorted(os.listdir(DATA_DIR))
 
 # --- GLOBALS ---
 sentence = ""
@@ -88,10 +85,18 @@ async def websocket_endpoint(websocket: WebSocket):
                 no_hand_count = 0
                 coords = []
                 bx, by = landmarks[0]['x'], landmarks[0]['y']
+                bx, by = landmarks[0][0], landmarks[0][1]
+
                 for lm in landmarks:
-                    coords.extend([lm['x'] - bx, lm['y'] - by, lm['z']])
+                    coords.extend([lm[0] - bx, lm[1] - by, lm[2]])
                 
-                p = model(np.array([coords]), training=False).numpy()
+                input_data = np.array([coords], dtype=np.float32)
+
+                interpreter.set_tensor(input_details[0]['index'], input_data)
+                interpreter.invoke()
+                
+                p = interpreter.get_tensor(output_details[0]['index'])[0]
+                
                 confidence = float(np.max(p))
                 action["confidence"] = confidence
                 input_data = np.array([coords], dtype=np.float32)
